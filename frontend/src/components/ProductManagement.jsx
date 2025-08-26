@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plus, 
   Search, 
@@ -15,34 +15,51 @@ import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { mockProducts, mockCategories } from '../mock/mockData';
+import { productsAPI } from '../services/api';
 import { useToast } from '../hooks/use-toast';
 
 const ProductManagement = () => {
-  const [products, setProducts] = useState(mockProducts);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [categories, setCategories] = useState([]);
   const { toast } = useToast();
 
-  // Filter products
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = 
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.barcode.includes(searchTerm) ||
-      product.brand.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
-    
-    const matchesStock = 
-      stockFilter === 'all' ||
-      (stockFilter === 'low' && product.stock <= product.minStock) ||
-      (stockFilter === 'normal' && product.stock > product.minStock);
-    
-    return matchesSearch && matchesCategory && matchesStock;
-  });
+  useEffect(() => {
+    loadProducts();
+  }, [searchTerm, categoryFilter, stockFilter]);
+
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      
+      const params = {};
+      if (searchTerm) params.search = searchTerm;
+      if (categoryFilter !== 'all') params.category = categoryFilter;
+      if (stockFilter === 'low') params.low_stock = true;
+      
+      const data = await productsAPI.getProducts(params);
+      setProducts(data);
+      
+      // Extract unique categories
+      const uniqueCategories = [...new Set(data.map(p => p.category))];
+      setCategories(uniqueCategories);
+      
+    } catch (error) {
+      console.error('Failed to load products:', error);
+      toast({
+        title: "Hata",
+        description: "Ürünler yüklenemedi",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('tr-TR', {
@@ -65,55 +82,73 @@ const ProductManagement = () => {
     setShowAddForm(true);
   };
 
-  const handleDeleteProduct = (productId) => {
-    if (window.confirm('Bu ürünü silmek istediğinizden emin misiniz?')) {
-      setProducts(products.filter(p => p.id !== productId));
-      toast({
-        title: "Ürün silindi",
-        description: "Ürün başarıyla silindi.",
-      });
+  const handleDeleteProduct = async (product) => {
+    if (window.confirm(`"${product.name}" ürününü silmek istediğinizden emin misiniz?`)) {
+      try {
+        await productsAPI.deleteProduct(product.id);
+        toast({
+          title: "Ürün silindi",
+          description: "Ürün başarıyla silindi.",
+        });
+        loadProducts();
+      } catch (error) {
+        toast({
+          title: "Hata",
+          description: "Ürün silinirken hata oluştu",
+          variant: "destructive"
+        });
+      }
     }
   };
 
-  const ProductForm = ({ product, onClose, onSave }) => {
+  const ProductForm = ({ product, onClose }) => {
     const [formData, setFormData] = useState(product || {
       barcode: '',
       name: '',
       category: '',
       brand: '',
       stock: 0,
-      minStock: 0,
-      buyPrice: 0,
-      sellPrice: 0,
-      taxRate: 18,
+      min_stock: 0,
+      buy_price: 0,
+      sell_price: 0,
+      tax_rate: 18,
       supplier: ''
     });
+    const [saving, setSaving] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
       e.preventDefault();
+      setSaving(true);
       
-      if (product) {
-        // Edit existing product
-        setProducts(products.map(p => p.id === product.id ? { ...formData, id: product.id } : p));
+      try {
+        if (product) {
+          // Edit existing product
+          await productsAPI.updateProduct(product.id, formData);
+          toast({
+            title: "Ürün güncellendi",
+            description: "Ürün bilgileri başarıyla güncellendi.",
+          });
+        } else {
+          // Add new product
+          await productsAPI.createProduct(formData);
+          toast({
+            title: "Ürün eklendi",
+            description: "Yeni ürün başarıyla eklendi.",
+          });
+        }
+        
+        onClose();
+        loadProducts();
+      } catch (error) {
+        console.error('Save error:', error);
         toast({
-          title: "Ürün güncellendi",
-          description: "Ürün bilgileri başarıyla güncellendi.",
+          title: "Hata",
+          description: error.response?.data?.detail || "Ürün kaydedilemedi",
+          variant: "destructive"
         });
-      } else {
-        // Add new product
-        const newProduct = {
-          ...formData,
-          id: Date.now().toString(),
-          lastUpdated: new Date().toISOString()
-        };
-        setProducts([...products, newProduct]);
-        toast({
-          title: "Ürün eklendi",
-          description: "Yeni ürün başarıyla eklendi.",
-        });
+      } finally {
+        setSaving(false);
       }
-      
-      onClose();
     };
 
     return (
@@ -147,17 +182,18 @@ const ProductManagement = () => {
                 
                 <div>
                   <label className="block text-sm font-medium mb-1">Kategori</label>
-                  <select
+                  <Input
                     value={formData.category}
                     onChange={(e) => setFormData({...formData, category: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Kategori"
+                    list="categories"
                     required
-                  >
-                    <option value="">Kategori seçin</option>
-                    {mockCategories.map(category => (
-                      <option key={category} value={category}>{category}</option>
+                  />
+                  <datalist id="categories">
+                    {categories.map(category => (
+                      <option key={category} value={category} />
                     ))}
-                  </select>
+                  </datalist>
                 </div>
                 
                 <div>
@@ -186,8 +222,8 @@ const ProductManagement = () => {
                   <label className="block text-sm font-medium mb-1">Minimum Stok</label>
                   <Input
                     type="number"
-                    value={formData.minStock}
-                    onChange={(e) => setFormData({...formData, minStock: parseInt(e.target.value) || 0})}
+                    value={formData.min_stock}
+                    onChange={(e) => setFormData({...formData, min_stock: parseInt(e.target.value) || 0})}
                     placeholder="Minimum stok adedi"
                     min="0"
                     required
@@ -199,8 +235,8 @@ const ProductManagement = () => {
                   <Input
                     type="number"
                     step="0.01"
-                    value={formData.buyPrice}
-                    onChange={(e) => setFormData({...formData, buyPrice: parseFloat(e.target.value) || 0})}
+                    value={formData.buy_price}
+                    onChange={(e) => setFormData({...formData, buy_price: parseFloat(e.target.value) || 0})}
                     placeholder="Alış fiyatı"
                     min="0"
                     required
@@ -212,8 +248,8 @@ const ProductManagement = () => {
                   <Input
                     type="number"
                     step="0.01"
-                    value={formData.sellPrice}
-                    onChange={(e) => setFormData({...formData, sellPrice: parseFloat(e.target.value) || 0})}
+                    value={formData.sell_price}
+                    onChange={(e) => setFormData({...formData, sell_price: parseFloat(e.target.value) || 0})}
                     placeholder="Satış fiyatı"
                     min="0"
                     required
@@ -223,8 +259,8 @@ const ProductManagement = () => {
                 <div>
                   <label className="block text-sm font-medium mb-1">KDV Oranı (%)</label>
                   <select
-                    value={formData.taxRate}
-                    onChange={(e) => setFormData({...formData, taxRate: parseInt(e.target.value)})}
+                    value={formData.tax_rate}
+                    onChange={(e) => setFormData({...formData, tax_rate: parseInt(e.target.value)})}
                     className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value={1}>%1</option>
@@ -236,7 +272,7 @@ const ProductManagement = () => {
                 <div>
                   <label className="block text-sm font-medium mb-1">Tedarikçi</label>
                   <Input
-                    value={formData.supplier}
+                    value={formData.supplier || ''}
                     onChange={(e) => setFormData({...formData, supplier: e.target.value})}
                     placeholder="Tedarikçi adı"
                   />
@@ -247,8 +283,8 @@ const ProductManagement = () => {
                 <Button type="button" variant="outline" onClick={onClose}>
                   İptal
                 </Button>
-                <Button type="submit">
-                  {product ? 'Güncelle' : 'Ekle'}
+                <Button type="submit" disabled={saving}>
+                  {saving ? 'Kaydediliyor...' : (product ? 'Güncelle' : 'Ekle')}
                 </Button>
               </div>
             </form>
@@ -288,7 +324,7 @@ const ProductManagement = () => {
               className="px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">Tüm Kategoriler</option>
-              {mockCategories.map(category => (
+              {categories.map(category => (
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>
@@ -311,11 +347,15 @@ const ProductManagement = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Package className="h-5 w-5" />
-            Ürünler ({filteredProducts.length})
+            Ürünler ({products.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredProducts.length === 0 ? (
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : products.length === 0 ? (
             <Alert>
               <Package className="h-4 w-4" />
               <AlertDescription>
@@ -337,7 +377,7 @@ const ProductManagement = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProducts.map((product) => (
+                  {products.map((product) => (
                     <tr key={product.id} className="border-b hover:bg-gray-50">
                       <td className="py-3">
                         <div>
@@ -350,19 +390,19 @@ const ProductManagement = () => {
                       </td>
                       <td className="py-3">
                         <div className="flex items-center gap-2">
-                          <span className={product.stock <= product.minStock ? 'text-red-600 font-bold' : ''}>
+                          <span className={product.stock <= product.min_stock ? 'text-red-600 font-bold' : ''}>
                             {product.stock}
                           </span>
-                          {product.stock <= product.minStock && (
+                          {product.stock <= product.min_stock && (
                             <AlertTriangle className="h-4 w-4 text-red-500" />
                           )}
                         </div>
                       </td>
-                      <td className="py-3">{formatCurrency(product.buyPrice)}</td>
-                      <td className="py-3">{formatCurrency(product.sellPrice)}</td>
+                      <td className="py-3">{formatCurrency(product.buy_price)}</td>
+                      <td className="py-3">{formatCurrency(product.sell_price)}</td>
                       <td className="py-3">
                         <Badge variant="outline">
-                          %{calculateProfitMargin(product.buyPrice, product.sellPrice)}
+                          %{calculateProfitMargin(product.buy_price, product.sell_price)}
                         </Badge>
                       </td>
                       <td className="py-3 text-right">
@@ -377,7 +417,7 @@ const ProductManagement = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteProduct(product.id)}
+                            onClick={() => handleDeleteProduct(product)}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
                           </Button>
@@ -397,7 +437,6 @@ const ProductManagement = () => {
         <ProductForm
           product={editingProduct}
           onClose={() => setShowAddForm(false)}
-          onSave={() => {}}
         />
       )}
     </div>
