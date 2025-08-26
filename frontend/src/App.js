@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { 
@@ -13,8 +13,8 @@ import {
   Store
 } from "lucide-react";
 import { Button } from "./components/ui/button";
-import { Card } from "./components/ui/card";
 import { Toaster } from "./components/ui/toaster";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 
 import Login from "./components/Login";
 import AdminDashboard from "./components/AdminDashboard";
@@ -23,21 +23,25 @@ import StockManagement from "./components/StockManagement";
 import CashierSales from "./components/CashierSales";
 import SalesReports from "./components/SalesReports";
 
-function App() {
-  const [user, setUser] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+function AppContent() {
+  const { user, logout, loading } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = React.useState(false);
 
-  const handleLogin = (userData) => {
-    setUser(userData);
-  };
-
-  const handleLogout = () => {
-    setUser(null);
+  const handleLogout = async () => {
+    await logout();
     setSidebarOpen(false);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   if (!user) {
-    return <Login onLogin={handleLogin} />;
+    return <Login />;
   }
 
   const adminMenuItems = [
@@ -105,7 +109,7 @@ function App() {
       <nav className="mt-8">
         <div className="px-4 mb-4">
           <div className="bg-gray-800 rounded-lg p-3">
-            <p className="text-white font-medium">{user.fullName}</p>
+            <p className="text-white font-medium">{user.full_name}</p>
             <p className="text-gray-400 text-sm capitalize">{user.role === 'admin' ? 'Admin' : 'Kasiyer'}</p>
           </div>
         </div>
@@ -156,7 +160,7 @@ function App() {
         
         <div className="flex items-center gap-4 ml-auto">
           <div className="text-right">
-            <p className="text-sm font-medium">{user.fullName}</p>
+            <p className="text-sm font-medium">{user.full_name}</p>
             <p className="text-xs text-gray-500 capitalize">{user.role === 'admin' ? 'Yönetici' : 'Kasiyer'}</p>
           </div>
         </div>
@@ -198,13 +202,31 @@ function App() {
           <Header />
           
           <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-            {getCurrentComponent()}
+            <Routes>
+              <Route path="/" element={<Navigate to={defaultPath} replace />} />
+              {menuItems.map((item) => (
+                <Route 
+                  key={item.path}
+                  path={item.path} 
+                  element={<item.component user={user} />} 
+                />
+              ))}
+              <Route path="*" element={<Navigate to={defaultPath} replace />} />
+            </Routes>
           </main>
         </div>
         
         <Toaster />
       </div>
     </BrowserRouter>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
