@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   BarChart3, 
   Package, 
@@ -11,38 +11,50 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { mockProducts, mockSales } from '../mock/mockData';
+import { dashboardAPI, stockAPI, salesAPI } from '../services/api';
 
 const AdminDashboard = () => {
-  const [timeRange, setTimeRange] = useState('today');
+  const [stats, setStats] = useState(null);
+  const [topProducts, setTopProducts] = useState([]);
+  const [cashierPerformance, setCashierPerformance] = useState([]);
+  const [lowStockProducts, setLowStockProducts] = useState([]);
+  const [recentSales, setRecentSales] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Calculate statistics
-  const totalProducts = mockProducts.length;
-  const totalStock = mockProducts.reduce((sum, product) => sum + product.stock, 0);
-  const lowStockItems = mockProducts.filter(product => product.stock <= product.minStock);
-  
-  const todaySales = mockSales.filter(sale => {
-    const saleDate = new Date(sale.date);
-    const today = new Date();
-    return saleDate.toDateString() === today.toDateString();
-  });
-  
-  const todayRevenue = todaySales.reduce((sum, sale) => sum + sale.total, 0);
-  const todayItemsSold = todaySales.reduce((sum, sale) => 
-    sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0
-  );
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
 
-  // Top selling products (mock calculation)
-  const topProducts = mockProducts
-    .map(product => ({
-      ...product,
-      soldQuantity: Math.floor(Math.random() * 20) + 1
-    }))
-    .sort((a, b) => b.soldQuantity - a.soldQuantity)
-    .slice(0, 5);
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      const [
+        statsData,
+        topProductsData,
+        cashierData,
+        lowStockData,
+        salesData
+      ] = await Promise.all([
+        dashboardAPI.getStats(),
+        dashboardAPI.getTopProducts(5),
+        dashboardAPI.getCashierPerformance(),
+        stockAPI.getLowStockProducts(),
+        salesAPI.getSales({ limit: 5 })
+      ]);
 
-  // Recent low stock alerts
-  const recentAlerts = lowStockItems.slice(0, 5);
+      setStats(statsData);
+      setTopProducts(topProductsData);
+      setCashierPerformance(cashierData);
+      setLowStockProducts(lowStockData);
+      setRecentSales(salesData);
+      
+    } catch (error) {
+      console.error('Failed to load dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('tr-TR', {
@@ -60,21 +72,18 @@ const AdminDashboard = () => {
     });
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Admin Paneli</h1>
-        <div className="flex items-center gap-2">
-          <select 
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="today">Bugün</option>
-            <option value="week">Bu Hafta</option>
-            <option value="month">Bu Ay</option>
-          </select>
-        </div>
       </div>
 
       {/* Stats Overview */}
@@ -87,7 +96,7 @@ const AdminDashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalProducts}</div>
+            <div className="text-2xl font-bold">{stats?.total_products || 0}</div>
             <p className="text-xs text-gray-500">Aktif ürün sayısı</p>
           </CardContent>
         </Card>
@@ -100,7 +109,7 @@ const AdminDashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalStock}</div>
+            <div className="text-2xl font-bold">{stats?.total_stock || 0}</div>
             <p className="text-xs text-gray-500">Adet cinsinden</p>
           </CardContent>
         </Card>
@@ -113,7 +122,7 @@ const AdminDashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(todayRevenue)}</div>
+            <div className="text-2xl font-bold">{formatCurrency(stats?.daily_revenue || 0)}</div>
             <p className="text-xs text-gray-500">Bugünkü satış</p>
           </CardContent>
         </Card>
@@ -126,7 +135,7 @@ const AdminDashboard = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{lowStockItems.length}</div>
+            <div className="text-2xl font-bold text-red-600">{stats?.low_stock_count || 0}</div>
             <p className="text-xs text-gray-500">Kritik seviye</p>
           </CardContent>
         </Card>
@@ -143,23 +152,27 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {topProducts.map((product, index) => (
-                <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
-                      {index + 1}
+              {topProducts.length === 0 ? (
+                <p className="text-center text-gray-500 py-4">Henüz veri bulunmamaktadır</p>
+              ) : (
+                topProducts.map((product, index) => (
+                  <div key={product.product_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">{product.name}</p>
+                        <p className="text-xs text-gray-500">{product.category}</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-sm">{product.name}</p>
-                      <p className="text-xs text-gray-500">{product.category}</p>
+                    <div className="text-right">
+                      <Badge variant="outline">{product.quantity_sold} adet</Badge>
+                      <p className="text-xs text-gray-500 mt-1">{formatCurrency(product.revenue)}</p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <Badge variant="outline">{product.soldQuantity} adet</Badge>
-                    <p className="text-xs text-gray-500 mt-1">{formatCurrency(product.sellPrice)}</p>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -174,10 +187,10 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recentAlerts.length === 0 ? (
+              {lowStockProducts.length === 0 ? (
                 <p className="text-center text-gray-500 py-4">Stok uyarısı bulunmamaktadır</p>
               ) : (
-                recentAlerts.map((product) => (
+                lowStockProducts.slice(0, 5).map((product) => (
                   <div key={product.id} className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
                     <div>
                       <p className="font-medium text-sm">{product.name}</p>
@@ -185,7 +198,7 @@ const AdminDashboard = () => {
                     </div>
                     <div className="text-right">
                       <Badge variant="destructive">{product.stock} adet</Badge>
-                      <p className="text-xs text-red-600 mt-1">Min: {product.minStock}</p>
+                      <p className="text-xs text-red-600 mt-1">Min: {product.min_stock}</p>
                     </div>
                   </div>
                 ))
@@ -205,24 +218,58 @@ const AdminDashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {mockSales.map((sale) => (
-              <div key={sale.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div>
-                  <p className="font-medium">Satış #{sale.id}</p>
-                  <p className="text-sm text-gray-500">Kasiyer: {sale.cashier}</p>
-                  <p className="text-xs text-gray-400">{formatDate(sale.date)}</p>
+            {recentSales.length === 0 ? (
+              <p className="text-center text-gray-500 py-4">Henüz satış bulunmamaktadır</p>
+            ) : (
+              recentSales.map((sale) => (
+                <div key={sale.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                  <div>
+                    <p className="font-medium">Satış #{sale.id.slice(-8)}</p>
+                    <p className="text-sm text-gray-500">Kasiyer ID: {sale.cashier_id.slice(-8)}</p>
+                    <p className="text-xs text-gray-400">{formatDate(sale.created_at)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-lg">{formatCurrency(sale.total)}</p>
+                    <p className="text-sm text-gray-500">
+                      {sale.items.reduce((sum, item) => sum + item.quantity, 0)} ürün
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-bold text-lg">{formatCurrency(sale.total)}</p>
-                  <p className="text-sm text-gray-500">
-                    {sale.items.reduce((sum, item) => sum + item.quantity, 0)} ürün
-                  </p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
+
+      {/* Cashier Performance */}
+      {cashierPerformance.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-blue-600" />
+              Kasiyer Performansı
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {cashierPerformance.map((cashier, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div>
+                    <p className="font-medium">{cashier.cashier_name}</p>
+                    <p className="text-sm text-gray-500">{cashier.sales_count} satış</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold">{formatCurrency(cashier.total_revenue)}</p>
+                    <p className="text-xs text-gray-500">
+                      Ort: {formatCurrency(cashier.average_sale)}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

@@ -5,32 +5,27 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
-import { mockUsers } from '../mock/mockData';
+import { useAuth } from '../context/AuthContext';
 
-const Login = ({ onLogin }) => {
+const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    // Simulate login delay
-    setTimeout(() => {
-      const user = mockUsers.find(
-        u => u.username === username && u.password === password && u.active
-      );
-
-      if (user) {
-        onLogin(user);
-      } else {
-        setError('Kullanıcı adı veya şifre hatalı!');
-      }
-      setLoading(false);
-    }, 1000);
+    const result = await login({ username, password });
+    
+    if (!result.success) {
+      setError(result.error);
+    }
+    
+    setLoading(false);
   };
 
   return (
