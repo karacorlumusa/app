@@ -15,7 +15,7 @@ import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { mockProducts, simulateBarcodeScan } from '../mock/mockData';
+import { productsAPI, salesAPI } from '../services/api';
 import { useToast } from '../hooks/use-toast';
 
 const CashierSales = ({ user }) => {
@@ -24,6 +24,7 @@ const CashierSales = ({ user }) => {
   const [quantityInput, setQuantityInput] = useState(1);
   const [currentSale, setCurrentSale] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
   const barcodeInputRef = useRef(null);
   const { toast } = useToast();
 
@@ -35,22 +36,34 @@ const CashierSales = ({ user }) => {
   }, [cart]);
 
   // Handle barcode input
-  const handleBarcodeSubmit = (e) => {
+  const handleBarcodeSubmit = async (e) => {
     e.preventDefault();
     if (!barcodeInput.trim()) return;
 
-    const product = simulateBarcodeScan(barcodeInput.trim());
-    if (product) {
-      addToCart(product, quantityInput);
-      setBarcodeInput('');
-      setQuantityInput(1);
-    } else {
+    setIsScanning(true);
+    try {
+      const product = await productsAPI.getProductByBarcode(barcodeInput.trim());
+      if (product) {
+        addToCart(product, quantityInput);
+        setBarcodeInput('');
+        setQuantityInput(1);
+      } else {
+        toast({
+          title: "Ürün bulunamadı",
+          description: `Barkod: ${barcodeInput}`,
+          variant: "destructive"
+        });
+        setBarcodeInput('');
+      }
+    } catch (error) {
+      console.error('Barcode scan error:', error);
       toast({
-        title: "Ürün bulunamadı",
-        description: `Barkod: ${barcodeInput}`,
+        title: "Hata",
+        description: "Barkod taranırken hata oluştu",
         variant: "destructive"
       });
-      setBarcodeInput('');
+    } finally {
+      setIsScanning(false);
     }
   };
 
@@ -65,7 +78,7 @@ const CashierSales = ({ user }) => {
       return;
     }
 
-    const existingItem = cart.find(item => item.productId === product.id);
+    const existingItem = cart.find(item => item.product_id === product.id);
     
     if (existingItem) {
       const newQuantity = existingItem.quantity + quantity;
@@ -79,20 +92,20 @@ const CashierSales = ({ user }) => {
       }
       
       setCart(cart.map(item =>
-        item.productId === product.id
-          ? { ...item, quantity: newQuantity, totalPrice: newQuantity * product.sellPrice }
+        item.product_id === product.id
+          ? { ...item, quantity: newQuantity, total_price: newQuantity * product.sell_price }
           : item
       ));
     } else {
       const cartItem = {
-        productId: product.id,
+        product_id: product.id,
         barcode: product.barcode,
-        name: product.name,
-        unitPrice: product.sellPrice,
+        product_name: product.name,
         quantity: quantity,
-        totalPrice: quantity * product.sellPrice,
-        taxRate: product.taxRate,
-        availableStock: product.stock
+        unit_price: product.sell_price,
+        tax_rate: product.tax_rate,
+        total_price: quantity * product.sell_price,
+        available_stock: product.stock
       };
       setCart([...cart, cartItem]);
     }
@@ -110,26 +123,26 @@ const CashierSales = ({ user }) => {
       return;
     }
 
-    const item = cart.find(item => item.productId === productId);
-    if (item && newQuantity > item.availableStock) {
+    const item = cart.find(item => item.product_id === productId);
+    if (item && newQuantity > item.available_stock) {
       toast({
         title: "Yetersiz stok",
-        description: `Maksimum ${item.availableStock} adet`,
+        description: `Maksimum ${item.available_stock} adet`,
         variant: "destructive"
       });
       return;
     }
 
     setCart(cart.map(item =>
-      item.productId === productId
-        ? { ...item, quantity: newQuantity, totalPrice: newQuantity * item.unitPrice }
+      item.product_id === productId
+        ? { ...item, quantity: newQuantity, total_price: newQuantity * item.unit_price }
         : item
     ));
   };
 
   // Remove item from cart
   const removeFromCart = (productId) => {
-    setCart(cart.filter(item => item.productId !== productId));
+    setCart(cart.filter(item => item.product_id !== productId));
   };
 
   // Clear cart
@@ -140,12 +153,12 @@ const CashierSales = ({ user }) => {
   };
 
   // Calculate totals
-  const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
-  const taxAmount = cart.reduce((sum, item) => sum + (item.totalPrice * item.taxRate / 100), 0);
+  const subtotal = cart.reduce((sum, item) => sum + item.total_price, 0);
+  const taxAmount = cart.reduce((sum, item) => sum + (item.total_price * item.tax_rate / 100), 0);
   const total = subtotal + taxAmount;
 
   // Process sale
-  const processSale = () => {
+  const processSale = async () => {
     if (cart.length === 0) {
       toast({
         title: "Sepet boş",
@@ -157,27 +170,38 @@ const CashierSales = ({ user }) => {
 
     setIsProcessing(true);
 
-    // Simulate processing delay
-    setTimeout(() => {
+    try {
       const saleData = {
-        id: `S${Date.now()}`,
-        date: new Date().toISOString(),
-        cashier: user.fullName,
-        items: cart,
-        subtotal,
-        taxAmount,
-        total
+        items: cart.map(item => ({
+          product_id: item.product_id,
+          barcode: item.barcode,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          tax_rate: item.tax_rate
+        }))
       };
 
-      setCurrentSale(saleData);
+      const sale = await salesAPI.createSale(saleData);
+      
+      setCurrentSale(sale);
       clearCart();
-      setIsProcessing(false);
-
+      
       toast({
         title: "Satış tamamlandı",
-        description: `Toplam: ${formatCurrency(total)}`,
+        description: `Toplam: ${formatCurrency(sale.total)}`,
       });
-    }, 1500);
+      
+    } catch (error) {
+      console.error('Sale processing error:', error);
+      toast({
+        title: "Satış hatası",
+        description: error.response?.data?.detail || "Satış işlemi başarısız",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const formatCurrency = (amount) => {
@@ -216,6 +240,7 @@ const CashierSales = ({ user }) => {
                   onChange={(e) => setBarcodeInput(e.target.value)}
                   placeholder="Barkod okutun veya yazın..."
                   className="text-lg h-12"
+                  disabled={isScanning}
                 />
               </div>
               <div className="w-24">
@@ -226,10 +251,15 @@ const CashierSales = ({ user }) => {
                   onChange={(e) => setQuantityInput(parseInt(e.target.value) || 1)}
                   placeholder="Adet"
                   className="h-12"
+                  disabled={isScanning}
                 />
               </div>
-              <Button type="submit" size="lg">
-                <Plus className="h-4 w-4" />
+              <Button type="submit" size="lg" disabled={isScanning}>
+                {isScanning ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
               </Button>
             </form>
           </CardContent>
@@ -260,18 +290,18 @@ const CashierSales = ({ user }) => {
             ) : (
               <div className="space-y-2">
                 {cart.map((item) => (
-                  <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div key={item.product_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex-1">
-                      <p className="font-medium text-sm">{item.name}</p>
+                      <p className="font-medium text-sm">{item.product_name}</p>
                       <p className="text-xs text-gray-500">{item.barcode}</p>
-                      <p className="text-sm font-bold text-blue-600">{formatCurrency(item.unitPrice)}</p>
+                      <p className="text-sm font-bold text-blue-600">{formatCurrency(item.unit_price)}</p>
                     </div>
                     
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                        onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
                       >
                         <Minus className="h-3 w-3" />
                       </Button>
@@ -281,7 +311,7 @@ const CashierSales = ({ user }) => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                        onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
                       >
                         <Plus className="h-3 w-3" />
                       </Button>
@@ -289,14 +319,14 @@ const CashierSales = ({ user }) => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => removeFromCart(item.productId)}
+                        onClick={() => removeFromCart(item.product_id)}
                       >
                         <Trash2 className="h-3 w-3 text-red-500" />
                       </Button>
                     </div>
                     
                     <div className="text-right ml-4">
-                      <p className="font-bold">{formatCurrency(item.totalPrice)}</p>
+                      <p className="font-bold">{formatCurrency(item.total_price)}</p>
                     </div>
                   </div>
                 ))}
@@ -316,7 +346,7 @@ const CashierSales = ({ user }) => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="font-medium">{user.fullName}</p>
+            <p className="font-medium">{user.full_name}</p>
             <p className="text-sm text-gray-500">{user.username}</p>
           </CardContent>
         </Card>
@@ -378,19 +408,19 @@ const CashierSales = ({ user }) => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="text-center">
-                <p className="text-sm text-gray-600">Satış No: {currentSale.id}</p>
+                <p className="text-sm text-gray-600">Satış No: #{currentSale.id.slice(-8)}</p>
                 <p className="text-sm text-gray-600">
-                  {new Date(currentSale.date).toLocaleString('tr-TR')}
+                  {new Date(currentSale.created_at).toLocaleString('tr-TR')}
                 </p>
-                <p className="text-sm text-gray-600">Kasiyer: {currentSale.cashier}</p>
+                <p className="text-sm text-gray-600">Kasiyer: {user.full_name}</p>
               </div>
               
               <div className="border rounded-lg p-4 bg-gray-50">
                 <div className="space-y-1">
                   {currentSale.items.map((item, index) => (
                     <div key={index} className="flex justify-between text-sm">
-                      <span>{item.name} x{item.quantity}</span>
-                      <span>{formatCurrency(item.totalPrice)}</span>
+                      <span>{item.product_name} x{item.quantity}</span>
+                      <span>{formatCurrency(item.total_price)}</span>
                     </div>
                   ))}
                 </div>
@@ -402,7 +432,7 @@ const CashierSales = ({ user }) => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>KDV:</span>
-                    <span>{formatCurrency(currentSale.taxAmount)}</span>
+                    <span>{formatCurrency(currentSale.tax_amount)}</span>
                   </div>
                   <div className="flex justify-between font-bold">
                     <span>TOPLAM:</span>
