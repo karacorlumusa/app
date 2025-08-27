@@ -1,8 +1,8 @@
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
-from models import *
-from database import *
-from auth import hash_password
+from .models import *
+from .database import *
+from .auth import hash_password
 import logging
 
 logger = logging.getLogger(__name__)

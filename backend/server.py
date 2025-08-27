@@ -2,16 +2,17 @@ from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pathlib import Path
+import uuid
 import os
 import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 
 # Import our modules
-from models import *
-from database import connect_to_mongo, close_mongo_connection
-from auth import authenticate_user, create_access_token, get_current_user, get_current_admin_user, create_admin_user_if_not_exists
-from services import UserService, ProductService, StockService, SalesService, DashboardService
+from .models import *
+from .database import connect_to_mongo, close_mongo_connection
+from .auth import authenticate_user, create_access_token, get_current_user, get_current_admin_user, create_admin_user_if_not_exists
+from .services import UserService, ProductService, StockService, SalesService, DashboardService
 
 # Load environment variables
 ROOT_DIR = Path(__file__).parent
@@ -31,11 +32,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware
+# CORS middleware (read allowed origins from env, comma-separated)
+origins_env = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+allow_origins = [o.strip() for o in origins_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -320,8 +323,8 @@ async def shutdown_event():
 
 async def create_default_admin():
     """Create default admin user if none exists"""
-    from database import find_one, insert_one
-    from auth import hash_password
+    from .database import find_one, insert_one
+    from .auth import hash_password
     
     # Check if any admin user exists
     admin_user = await find_one("users", {"role": "admin"})
@@ -371,7 +374,7 @@ async def create_default_admin():
 
 async def create_sample_products():
     """Create sample products for testing"""
-    from database import insert_one
+    from .database import insert_one
     
     sample_products = [
         {

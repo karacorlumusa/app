@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { 
-  BarChart3, 
-  Calendar, 
-  DollarSign, 
-  TrendingUp, 
+import React, { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  BarChart3,
+  Calendar,
+  DollarSign,
+  TrendingUp,
   Package,
   FileText,
   Download,
@@ -13,60 +14,106 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { mockSales, mockProducts } from '../mock/mockData';
+import { salesAPI, dashboardAPI } from '../services/api';
+import { useToast } from '../hooks/use-toast';
 
 const SalesReports = () => {
   const [dateRange, setDateRange] = useState({
     start: new Date().toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0]
   });
+  const [loading, setLoading] = useState(false);
+  const [sales, setSales] = useState([]);
   const [selectedSale, setSelectedSale] = useState(null);
+  const [cashierPerf, setCashierPerf] = useState([]);
+  const { toast } = useToast();
 
-  // Filter sales by date range
-  const filteredSales = mockSales.filter(sale => {
-    const saleDate = new Date(sale.date).toISOString().split('T')[0];
-    return saleDate >= dateRange.start && saleDate <= dateRange.end;
-  });
+  const toISOStart = (dateStr) => {
+    const d = new Date(dateStr + 'T00:00:00');
+    return d.toISOString();
+  };
+  const toISOEnd = (dateStr) => {
+    const d = new Date(dateStr + 'T23:59:59');
+    return d.toISOString();
+  };
+
+  const fetchSales = async () => {
+    setLoading(true);
+    try {
+      const params = {
+        start_date: toISOStart(dateRange.start),
+        end_date: toISOEnd(dateRange.end)
+      };
+      const data = await salesAPI.getSales(params);
+      setSales(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('fetchSales error', err);
+      toast({ title: 'Rapor hatası', description: 'Satışlar alınamadı', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchCashierPerformance = async () => {
+    try {
+      const perf = await dashboardAPI.getCashierPerformance();
+      setCashierPerf(Array.isArray(perf) ? perf : []);
+    } catch {
+      // optional; ignore silently
+    }
+  };
+
+  useEffect(() => {
+    fetchSales();
+    fetchCashierPerformance();
+  }, []);
+
+  const filteredSales = sales; // already filtered by API
 
   // Calculate statistics
-  const totalRevenue = filteredSales.reduce((sum, sale) => sum + sale.total, 0);
-  const totalItemsSold = filteredSales.reduce((sum, sale) => 
-    sum + sale.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0
+  const totalRevenue = useMemo(() => filteredSales.reduce((sum, sale) => sum + (sale.total || 0), 0), [filteredSales]);
+  const totalItemsSold = useMemo(
+    () => filteredSales.reduce((sum, sale) => sum + (sale.items || []).reduce((s, i) => s + (i.quantity || 0), 0), 0),
+    [filteredSales]
   );
   const averageSaleValue = filteredSales.length > 0 ? totalRevenue / filteredSales.length : 0;
 
-  // Top selling products
-  const productSales = {};
-  filteredSales.forEach(sale => {
-    sale.items.forEach(item => {
-      if (!productSales[item.productId]) {
-        productSales[item.productId] = {
-          name: item.name,
-          quantity: 0,
-          revenue: 0
-        };
-      }
-      productSales[item.productId].quantity += item.quantity;
-      productSales[item.productId].revenue += item.totalPrice;
+  // Top selling products (derived)
+  const topProducts = useMemo(() => {
+    const map = new Map();
+    filteredSales.forEach(sale => {
+      (sale.items || []).forEach(item => {
+        const key = item.product_id;
+        const prev = map.get(key) || { name: item.product_name, quantity: 0, revenue: 0 };
+        prev.quantity += item.quantity || 0;
+        prev.revenue += item.total_price || (item.unit_price || 0) * (item.quantity || 0);
+        prev.name = item.product_name || prev.name;
+        map.set(key, prev);
+      });
     });
-  });
+    return Array.from(map.values()).sort((a, b) => b.quantity - a.quantity).slice(0, 5);
+  }, [filteredSales]);
 
-  const topProducts = Object.values(productSales)
-    .sort((a, b) => b.quantity - a.quantity)
-    .slice(0, 5);
-
-  // Sales by cashier
-  const cashierSales = {};
-  filteredSales.forEach(sale => {
-    if (!cashierSales[sale.cashier]) {
-      cashierSales[sale.cashier] = {
-        count: 0,
-        revenue: 0
-      };
+  // Cashier performance (API result if available)
+  const cashierSales = useMemo(() => {
+    if (cashierPerf.length > 0) {
+      // Convert to map cashier_name -> {count, revenue}
+      const obj = {};
+      cashierPerf.forEach(row => {
+        obj[row.cashier_name] = { count: row.sales_count, revenue: row.total_revenue };
+      });
+      return obj;
     }
-    cashierSales[sale.cashier].count += 1;
-    cashierSales[sale.cashier].revenue += sale.total;
-  });
+    // Fallback: derive unknown names using cashier_id
+    const obj = {};
+    filteredSales.forEach(sale => {
+      const key = sale.cashier_id || 'Bilinmiyor';
+      if (!obj[key]) obj[key] = { count: 0, revenue: 0 };
+      obj[key].count += 1;
+      obj[key].revenue += sale.total || 0;
+    });
+    return obj;
+  }, [cashierPerf, filteredSales]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('tr-TR', {
@@ -76,6 +123,7 @@ const SalesReports = () => {
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return '';
     return new Date(dateString).toLocaleDateString('tr-TR', {
       day: '2-digit',
       month: '2-digit',
@@ -85,71 +133,152 @@ const SalesReports = () => {
     });
   };
 
-  const SaleDetailModal = ({ sale, onClose }) => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <CardHeader>
-          <CardTitle>Satış Detayı - {sale.id}</CardTitle>
-          <div className="text-sm text-gray-600">
-            <p>Tarih: {formatDate(sale.date)}</p>
-            <p>Kasiyer: {sale.cashier}</p>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h3 className="font-medium mb-3">Satılan Ürünler</h3>
-            <div className="space-y-2">
-              {sale.items.map((item, index) => (
-                <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-gray-500">{item.barcode}</p>
+  // Export helpers
+  const handleExportCSV = () => {
+    const header = [
+      'SatisID', 'Tarih', 'KasiyerID', 'UrunAdedi', 'AraToplam', 'KDV', 'Toplam'
+    ];
+    const rows = filteredSales.map(sale => [
+      sale.id,
+      new Date(sale.created_at).toISOString(),
+      sale.cashier_id || '',
+      (sale.items || []).reduce((sum, i) => sum + (i.quantity || 0), 0),
+      (sale.subtotal ?? 0).toString().replace('.', ','),
+      (sale.tax_amount ?? 0).toString().replace('.', ','),
+      (sale.total ?? 0).toString().replace('.', ',')
+    ]);
+    const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `satis_raporu_${dateRange.start}_${dateRange.end}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const SaleDetailModal = ({ sale, onClose }) => {
+    const handleDownloadPDF = () => {
+      const title = `Satış Fişi - ${sale.id}`;
+      const rows = (sale.items || []).map(i => `
+        <tr>
+          <td>${i.product_name}</td>
+          <td>${i.barcode}</td>
+          <td style="text-align:right;">${i.quantity}</td>
+          <td style="text-align:right;">${formatCurrency(i.unit_price)}</td>
+          <td style="text-align:right;">${formatCurrency(i.total_price)}</td>
+        </tr>`).join('');
+      const html = `<!doctype html><html><head><meta charset="utf-8"/>
+        <title>${title}</title>
+        <style>
+          body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:#111}
+          h1{font-size:18px;margin:0 0 8px}
+          .meta{font-size:12px;color:#555;margin-bottom:12px}
+          table{width:100%;border-collapse:collapse;margin-top:12px}
+          th,td{border:1px solid #ccc;padding:6px;font-size:12px}
+          th{background:#f5f5f5;text-align:left}
+          .totals{margin-top:12px;float:right}
+          .totals table{width:auto}
+        </style></head><body>
+        <h1>${title}</h1>
+        <div class="meta">
+          <div>Tarih: ${formatDate(sale.created_at)}</div>
+          <div>Kasiyer ID: ${sale.cashier_id || ''}</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Ürün</th><th>Barkod</th><th>Adet</th><th>Birim</th><th>Toplam</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <div class="totals">
+          <table>
+            <tr><th>Ara Toplam</th><td>${formatCurrency(sale.subtotal)}</td></tr>
+            <tr><th>KDV</th><td>${formatCurrency(sale.tax_amount)}</td></tr>
+            <tr><th>TOPLAM</th><td><strong>${formatCurrency(sale.total)}</strong></td></tr>
+          </table>
+        </div>
+        <script>window.onload=()=>{window.print(); setTimeout(()=>window.close(),500)}</script>
+        </body></html>`;
+      const w = window.open('', '_blank');
+      if (w) {
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+      }
+    };
+
+    return createPortal(
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <CardHeader>
+            <CardTitle>Satış Detayı - {sale.id}</CardTitle>
+            <div className="text-sm text-gray-600">
+              <p>Tarih: {formatDate(sale.created_at)}</p>
+              <p>Kasiyer: {sale.cashier_id || '—'}</p>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <h3 className="font-medium mb-3">Satılan Ürünler</h3>
+              <div className="space-y-2">
+                {(sale.items || []).map((item, index) => (
+                  <div key={`${item.product_id || index}-${index}`} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                    <div>
+                      <p className="font-medium">{item.product_name}</p>
+                      <p className="text-sm text-gray-500">{item.barcode}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium">{item.quantity} x {formatCurrency(item.unit_price)}</p>
+                      <p className="text-lg font-bold">{formatCurrency(item.total_price)}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium">{item.quantity} x {formatCurrency(item.unitPrice)}</p>
-                    <p className="text-lg font-bold">{formatCurrency(item.totalPrice)}</p>
-                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Ara Toplam:</span>
+                  <span>{formatCurrency(sale.subtotal)}</span>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="border-t pt-4">
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Ara Toplam:</span>
-                <span>{formatCurrency(sale.subtotal)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>KDV:</span>
-                <span>{formatCurrency(sale.taxAmount)}</span>
-              </div>
-              <div className="flex justify-between font-bold text-lg">
-                <span>TOPLAM:</span>
-                <span>{formatCurrency(sale.total)}</span>
+                <div className="flex justify-between">
+                  <span>KDV:</span>
+                  <span>{formatCurrency(sale.tax_amount)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-lg">
+                  <span>TOPLAM:</span>
+                  <span>{formatCurrency(sale.total)}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={onClose}>
-              Kapat
-            </Button>
-            <Button>
-              <Download className="h-4 w-4 mr-2" />
-              PDF İndir
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={onClose}>
+                Kapat
+              </Button>
+              <Button onClick={handleDownloadPDF}>
+                <Download className="h-4 w-4 mr-2" />
+                PDF İndir
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>,
+      document.body
+    );
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Satış Raporları</h1>
-        <Button>
+        <Button onClick={handleExportCSV} disabled={loading || filteredSales.length === 0}>
           <Download className="h-4 w-4 mr-2" />
           Rapor İndir
         </Button>
@@ -164,7 +293,7 @@ const SalesReports = () => {
               <Input
                 type="date"
                 value={dateRange.start}
-                onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
+                onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
               />
             </div>
             <div className="flex-1">
@@ -172,10 +301,12 @@ const SalesReports = () => {
               <Input
                 type="date"
                 value={dateRange.end}
-                onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
+                onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
               />
             </div>
-            <Button>Filtrele</Button>
+            <Button onClick={fetchSales} disabled={loading}>
+              {loading ? 'Yükleniyor...' : 'Filtrele'}
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -299,7 +430,9 @@ const SalesReports = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredSales.length === 0 ? (
+          {loading ? (
+            <p className="text-center text-gray-500 py-8">Yükleniyor…</p>
+          ) : filteredSales.length === 0 ? (
             <p className="text-center text-gray-500 py-8">Seçilen tarih aralığında satış bulunamadı</p>
           ) : (
             <div className="overflow-x-auto">
@@ -318,10 +451,10 @@ const SalesReports = () => {
                   {filteredSales.map((sale) => (
                     <tr key={sale.id} className="border-b hover:bg-gray-50">
                       <td className="py-3 font-mono">{sale.id}</td>
-                      <td className="py-3">{formatDate(sale.date)}</td>
-                      <td className="py-3">{sale.cashier}</td>
+                      <td className="py-3">{formatDate(sale.created_at)}</td>
+                      <td className="py-3">{sale.cashier_id || '—'}</td>
                       <td className="py-3">
-                        {sale.items.reduce((sum, item) => sum + item.quantity, 0)} adet
+                        {(sale.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0)} adet
                       </td>
                       <td className="py-3 font-bold">{formatCurrency(sale.total)}</td>
                       <td className="py-3 text-right">

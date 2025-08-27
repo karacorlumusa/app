@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  ShoppingCart, 
-  Scan, 
-  Plus, 
-  Minus, 
-  Trash2, 
+import { createPortal } from 'react-dom';
+import {
+  ShoppingCart,
+  Scan,
+  Plus,
+  Minus,
+  Trash2,
   Calculator,
   Receipt,
   User,
@@ -79,7 +80,7 @@ const CashierSales = ({ user }) => {
     }
 
     const existingItem = cart.find(item => item.product_id === product.id);
-    
+
     if (existingItem) {
       const newQuantity = existingItem.quantity + quantity;
       if (newQuantity > product.stock) {
@@ -90,7 +91,7 @@ const CashierSales = ({ user }) => {
         });
         return;
       }
-      
+
       setCart(cart.map(item =>
         item.product_id === product.id
           ? { ...item, quantity: newQuantity, total_price: newQuantity * product.sell_price }
@@ -183,15 +184,15 @@ const CashierSales = ({ user }) => {
       };
 
       const sale = await salesAPI.createSale(saleData);
-      
+
       setCurrentSale(sale);
       clearCart();
-      
+
       toast({
         title: "Satış tamamlandı",
         description: `Toplam: ${formatCurrency(sale.total)}`,
       });
-      
+
     } catch (error) {
       console.error('Sale processing error:', error);
       toast({
@@ -296,7 +297,7 @@ const CashierSales = ({ user }) => {
                       <p className="text-xs text-gray-500">{item.barcode}</p>
                       <p className="text-sm font-bold text-blue-600">{formatCurrency(item.unit_price)}</p>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       <Button
                         variant="outline"
@@ -305,9 +306,9 @@ const CashierSales = ({ user }) => {
                       >
                         <Minus className="h-3 w-3" />
                       </Button>
-                      
+
                       <span className="w-12 text-center font-bold">{item.quantity}</span>
-                      
+
                       <Button
                         variant="outline"
                         size="sm"
@@ -315,7 +316,7 @@ const CashierSales = ({ user }) => {
                       >
                         <Plus className="h-3 w-3" />
                       </Button>
-                      
+
                       <Button
                         variant="ghost"
                         size="sm"
@@ -324,7 +325,7 @@ const CashierSales = ({ user }) => {
                         <Trash2 className="h-3 w-3 text-red-500" />
                       </Button>
                     </div>
-                    
+
                     <div className="text-right ml-4">
                       <p className="font-bold">{formatCurrency(item.total_price)}</p>
                     </div>
@@ -364,12 +365,12 @@ const CashierSales = ({ user }) => {
                 <span>Ara Toplam:</span>
                 <span>{formatCurrency(subtotal)}</span>
               </div>
-              
+
               <div className="flex justify-between">
                 <span>KDV:</span>
                 <span>{formatCurrency(taxAmount)}</span>
               </div>
-              
+
               <div className="border-t pt-2">
                 <div className="flex justify-between font-bold text-lg">
                   <span>TOPLAM:</span>
@@ -378,7 +379,7 @@ const CashierSales = ({ user }) => {
               </div>
             </div>
 
-            <Button 
+            <Button
               onClick={processSale}
               disabled={cart.length === 0 || isProcessing}
               className="w-full h-12 text-lg"
@@ -399,61 +400,63 @@ const CashierSales = ({ user }) => {
         </Card>
       </div>
 
-      {/* Sale Receipt Modal */}
-      {currentSale && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <Card className="w-full max-w-md">
-            <CardHeader className="text-center">
-              <CardTitle className="text-green-600">Satış Tamamlandı!</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Satış No: #{currentSale.id.slice(-8)}</p>
-                <p className="text-sm text-gray-600">
-                  {new Date(currentSale.created_at).toLocaleString('tr-TR')}
-                </p>
-                <p className="text-sm text-gray-600">Kasiyer: {user.full_name}</p>
-              </div>
-              
-              <div className="border rounded-lg p-4 bg-gray-50">
-                <div className="space-y-1">
-                  {currentSale.items.map((item, index) => (
-                    <div key={index} className="flex justify-between text-sm">
-                      <span>{item.product_name} x{item.quantity}</span>
-                      <span>{formatCurrency(item.total_price)}</span>
-                    </div>
-                  ))}
+      {/* Sale Receipt Modal (rendered in portal to avoid DOM reconciliation issues) */}
+      {currentSale &&
+        createPortal(
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <Card className="w-full max-w-md">
+              <CardHeader className="text-center">
+                <CardTitle className="text-green-600">Satış Tamamlandı!</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-center">
+                  <p className="text-sm text-gray-600">Satış No: #{currentSale.id?.slice?.(-8) || '-'}</p>
+                  <p className="text-sm text-gray-600">
+                    {currentSale.created_at ? new Date(currentSale.created_at).toLocaleString('tr-TR') : ''}
+                  </p>
+                  <p className="text-sm text-gray-600">Kasiyer: {user.full_name}</p>
                 </div>
-                
-                <div className="border-t mt-2 pt-2 space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>Ara Toplam:</span>
-                    <span>{formatCurrency(currentSale.subtotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>KDV:</span>
-                    <span>{formatCurrency(currentSale.tax_amount)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold">
-                    <span>TOPLAM:</span>
-                    <span>{formatCurrency(currentSale.total)}</span>
-                  </div>
-                </div>
-              </div>
 
-              <div className="flex gap-2">
-                <Button onClick={printReceipt} className="flex-1">
-                  <Receipt className="h-4 w-4 mr-2" />
-                  Fiş Yazdır
-                </Button>
-                <Button variant="outline" onClick={() => setCurrentSale(null)}>
-                  Kapat
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+                <div className="border rounded-lg p-4 bg-gray-50">
+                  <div className="space-y-1">
+                    {currentSale.items?.map((item, index) => (
+                      <div key={`${item.product_id || index}-${index}`} className="flex justify-between text-sm">
+                        <span>{item.product_name} x{item.quantity}</span>
+                        <span>{formatCurrency(item.total_price)}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="border-t mt-2 pt-2 space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span>Ara Toplam:</span>
+                      <span>{formatCurrency(currentSale.subtotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>KDV:</span>
+                      <span>{formatCurrency(currentSale.tax_amount)}</span>
+                    </div>
+                    <div className="flex justify-between font-bold">
+                      <span>TOPLAM:</span>
+                      <span>{formatCurrency(currentSale.total)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button onClick={printReceipt} className="flex-1">
+                    <Receipt className="h-4 w-4 mr-2" />
+                    Fiş Yazdır
+                  </Button>
+                  <Button variant="outline" onClick={() => setCurrentSale(null)}>
+                    Kapat
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };

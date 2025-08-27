@@ -20,11 +20,11 @@ const Login = () => {
     setError('');
 
     const result = await login({ username, password });
-    
+
     if (!result.success) {
       setError(result.error);
     }
-    
+
     setLoading(false);
   };
 
@@ -80,9 +80,9 @@ const Login = () => {
               </Alert>
             )}
 
-            <Button 
-              type="submit" 
-              className="w-full" 
+            <Button
+              type="submit"
+              className="w-full"
               disabled={loading}
             >
               {loading ? (
@@ -99,13 +99,7 @@ const Login = () => {
             </Button>
           </form>
 
-          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-            <h3 className="font-medium text-sm text-gray-700 mb-2">Demo Hesaplar:</h3>
-            <div className="space-y-1 text-xs text-gray-600">
-              <div><strong>Admin:</strong> admin / admin123</div>
-              <div><strong>Kasiyer:</strong> kasiyer1 / kasiyer123</div>
-            </div>
-          </div>
+          {/* Demo hesap bilgileri gizlendi */}
         </CardContent>
       </Card>
     </div>

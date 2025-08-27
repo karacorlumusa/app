@@ -1,12 +1,12 @@
 import React from "react";
 import "./App.css";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  Package, 
-  ShoppingCart, 
-  BarChart3, 
-  Archive, 
+import { BrowserRouter, Routes, Route, Navigate, NavLink } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Package,
+  ShoppingCart,
+  BarChart3,
+  Archive,
   LogOut,
   Menu,
   X,
@@ -22,6 +22,7 @@ import ProductManagement from "./components/ProductManagement";
 import StockManagement from "./components/StockManagement";
 import CashierSales from "./components/CashierSales";
 import SalesReports from "./components/SalesReports";
+import UsersManagement from "./components/UsersManagement";
 
 function AppContent() {
   const { user, logout, loading } = useAuth();
@@ -45,44 +46,50 @@ function AppContent() {
   }
 
   const adminMenuItems = [
-    { 
-      path: '/dashboard', 
-      name: 'Dashboard', 
+    {
+      path: '/dashboard',
+      name: 'Dashboard',
       icon: LayoutDashboard,
-      component: AdminDashboard 
+      component: AdminDashboard
     },
-    { 
-      path: '/products', 
-      name: 'Ürün Yönetimi', 
+    {
+      path: '/users',
+      name: 'Kullanıcılar',
+      icon: LayoutDashboard,
+      component: UsersManagement
+    },
+    {
+      path: '/products',
+      name: 'Ürün Yönetimi',
       icon: Package,
-      component: ProductManagement 
+      component: ProductManagement
     },
-    { 
-      path: '/stock', 
-      name: 'Stok Yönetimi', 
+    {
+      path: '/stock',
+      name: 'Stok Yönetimi',
       icon: Archive,
-      component: StockManagement 
+      component: StockManagement
     },
-    { 
-      path: '/sales', 
-      name: 'Satış İşlemleri', 
+    {
+      path: '/sales',
+      name: 'Satış İşlemleri',
       icon: ShoppingCart,
-      component: CashierSales 
+      component: CashierSales
     },
-    { 
-      path: '/reports', 
-      name: 'Satış Raporları', 
+    {
+      path: '/reports',
+      name: 'Satış Raporları',
       icon: BarChart3,
-      component: SalesReports 
+      component: SalesReports
     }
   ];
 
   const cashierMenuItems = [
-    { 
-      path: '/sales', 
-      name: 'Satış İşlemleri', 
+    {
+      path: '/sales',
+      name: 'Satış İşlemleri',
       icon: ShoppingCart,
-      component: CashierSales 
+      component: CashierSales
     }
   ];
 
@@ -105,7 +112,7 @@ function AppContent() {
           <X className="h-5 w-5" />
         </Button>
       </div>
-      
+
       <nav className="mt-8">
         <div className="px-4 mb-4">
           <div className="bg-gray-800 rounded-lg p-3">
@@ -113,25 +120,27 @@ function AppContent() {
             <p className="text-gray-400 text-sm capitalize">{user.role === 'admin' ? 'Admin' : 'Kasiyer'}</p>
           </div>
         </div>
-        
+
         <div className="space-y-1 px-2">
           {menuItems.map((item) => (
-            <a
+            <NavLink
               key={item.path}
-              href={item.path}
-              onClick={(e) => {
-                e.preventDefault();
-                window.history.pushState(null, '', item.path);
-                setSidebarOpen(false);
-              }}
-              className="flex items-center gap-3 px-3 py-2 text-gray-300 rounded-lg hover:bg-gray-800 hover:text-white transition-colors"
+              to={item.path}
+              end
+              onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ` +
+                (isActive
+                  ? 'bg-gray-800 text-white'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white')
+              }
             >
               <item.icon className="h-5 w-5" />
               {item.name}
-            </a>
+            </NavLink>
           ))}
         </div>
-        
+
         <div className="absolute bottom-4 left-2 right-2">
           <Button
             onClick={handleLogout}
@@ -157,7 +166,7 @@ function AppContent() {
         >
           <Menu className="h-5 w-5" />
         </Button>
-        
+
         <div className="flex items-center gap-4 ml-auto">
           <div className="text-right">
             <p className="text-sm font-medium">{user.full_name}</p>
@@ -171,12 +180,12 @@ function AppContent() {
   const getCurrentComponent = () => {
     const currentPath = window.location.pathname;
     const currentItem = menuItems.find(item => item.path === currentPath);
-    
+
     if (currentItem) {
       const Component = currentItem.component;
       return <Component user={user} />;
     }
-    
+
     // Default component based on user role
     if (user.role === 'admin') {
       return <AdminDashboard user={user} />;
@@ -190,32 +199,32 @@ function AppContent() {
       <div className="flex h-screen bg-gray-100">
         {/* Sidebar Overlay */}
         {sidebarOpen && (
-          <div 
+          <div
             className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
-        
+
         <Sidebar />
-        
+
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header />
-          
+
           <main className="flex-1 overflow-y-auto p-4 lg:p-6">
             <Routes>
               <Route path="/" element={<Navigate to={defaultPath} replace />} />
               {menuItems.map((item) => (
-                <Route 
+                <Route
                   key={item.path}
-                  path={item.path} 
-                  element={<item.component user={user} />} 
+                  path={item.path}
+                  element={<item.component user={user} />}
                 />
               ))}
               <Route path="*" element={<Navigate to={defaultPath} replace />} />
             </Routes>
           </main>
         </div>
-        
+
         <Toaster />
       </div>
     </BrowserRouter>
