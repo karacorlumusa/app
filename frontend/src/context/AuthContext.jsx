@@ -23,10 +23,10 @@ export const AuthProvider = ({ children }) => {
     try {
       const token = localStorage.getItem('access_token');
       const savedUser = localStorage.getItem('user');
-      
+
       if (token && savedUser) {
         setUser(JSON.parse(savedUser));
-        
+
         // Verify token is still valid
         try {
           await authAPI.getMe();
@@ -46,19 +46,20 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (credentials) => {
     try {
-      const response = await authAPI.login(credentials);
-      
-      localStorage.setItem('access_token', response.access_token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-      setUser(response.user);
-      
-      return { success: true, user: response.user };
+      const data = await authAPI.login(credentials);
+      if (!data?.access_token) throw new Error('Token alınamadı');
+      // Persist first, then update state
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setUser(data.user);
+      return { success: true };
     } catch (error) {
-      console.error('Login failed:', error);
-      return {
-        success: false,
-        error: error.response?.data?.detail || 'Login failed'
-      };
+      const message = error?.response?.data?.detail || error?.message || 'Giriş başarısız';
+      // Cleanup any partial state
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
+      setUser(null);
+      return { success: false, error: message };
     }
   };
 
