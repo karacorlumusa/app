@@ -33,17 +33,12 @@ function AppContent() {
     setSidebarOpen(false);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Login />;
-  }
+  // While auth state is loading, keep a neutral screen to avoid rapid mount/unmount
+  const LoadingScreen = (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+    </div>
+  );
 
   const adminMenuItems = [
     {
@@ -93,8 +88,8 @@ function AppContent() {
     }
   ];
 
-  const menuItems = user.role === 'admin' ? adminMenuItems : cashierMenuItems;
-  const defaultPath = user.role === 'admin' ? '/dashboard' : '/sales';
+  const menuItems = user?.role === 'admin' ? adminMenuItems : cashierMenuItems;
+  const defaultPath = user?.role === 'admin' ? '/dashboard' : '/sales';
 
   const Sidebar = () => (
     <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform lg:translate-x-0 lg:static lg:inset-0`}>
@@ -116,8 +111,8 @@ function AppContent() {
       <nav className="mt-8">
         <div className="px-4 mb-4">
           <div className="bg-gray-800 rounded-lg p-3">
-            <p className="text-white font-medium">{user.full_name}</p>
-            <p className="text-gray-400 text-sm capitalize">{user.role === 'admin' ? 'Admin' : 'Kasiyer'}</p>
+            <p className="text-white font-medium">{user?.full_name}</p>
+            <p className="text-gray-400 text-sm capitalize">{user?.role === 'admin' ? 'Admin' : 'Kasiyer'}</p>
           </div>
         </div>
 
@@ -169,64 +164,67 @@ function AppContent() {
 
         <div className="flex items-center gap-4 ml-auto">
           <div className="text-right">
-            <p className="text-sm font-medium">{user.full_name}</p>
-            <p className="text-xs text-gray-500 capitalize">{user.role === 'admin' ? 'Yönetici' : 'Kasiyer'}</p>
+            <p className="text-sm font-medium">{user?.full_name}</p>
+            <p className="text-xs text-gray-500 capitalize">{user?.role === 'admin' ? 'Yönetici' : 'Kasiyer'}</p>
           </div>
         </div>
       </div>
     </header>
   );
 
-  const getCurrentComponent = () => {
-    const currentPath = window.location.pathname;
-    const currentItem = menuItems.find(item => item.path === currentPath);
+  // Layout for authenticated area
+  const AuthedLayout = (
+    <div className="flex h-screen bg-gray-100">
+      {/* Sidebar Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-    if (currentItem) {
-      const Component = currentItem.component;
-      return <Component user={user} />;
-    }
+      <Sidebar />
 
-    // Default component based on user role
-    if (user.role === 'admin') {
-      return <AdminDashboard user={user} />;
-    } else {
-      return <CashierSales user={user} />;
-    }
-  };
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <Header />
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <Routes>
+            {/* default route based on role */}
+            <Route path="/" element={<Navigate to={defaultPath} replace />} />
+            {menuItems.map((item) => (
+              <Route
+                key={item.path}
+                path={item.path}
+                element={<item.component user={user} />}
+              />
+            ))}
+            <Route path="*" element={<Navigate to={defaultPath} replace />} />
+          </Routes>
+        </main>
+      </div>
+    </div>
+  );
 
   return (
     <BrowserRouter>
-      <div className="flex h-screen bg-gray-100">
-        {/* Sidebar Overlay */}
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
-            onClick={() => setSidebarOpen(false)}
+      {/* Always mount Toaster once to avoid portal churn */}
+      <Toaster />
+      {loading ? (
+        LoadingScreen
+      ) : (
+        <Routes>
+          {/* Login route */}
+          <Route
+            path="/login"
+            element={user ? <Navigate to={defaultPath} replace /> : <Login />}
           />
-        )}
-
-        <Sidebar />
-
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header />
-
-          <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-            <Routes>
-              <Route path="/" element={<Navigate to={defaultPath} replace />} />
-              {menuItems.map((item) => (
-                <Route
-                  key={item.path}
-                  path={item.path}
-                  element={<item.component user={user} />}
-                />
-              ))}
-              <Route path="*" element={<Navigate to={defaultPath} replace />} />
-            </Routes>
-          </main>
-        </div>
-
-        <Toaster />
-      </div>
+          {/* Everything else requires auth */}
+          <Route
+            path="/*"
+            element={user ? AuthedLayout : <Navigate to="/login" replace />}
+          />
+        </Routes>
+      )}
     </BrowserRouter>
   );
 }
