@@ -44,14 +44,14 @@ export const authAPI = {
     const response = await api.post('/auth/login', credentials);
     return response.data;
   },
-  
+
   logout: async () => {
     const response = await api.post('/auth/logout');
     localStorage.removeItem('access_token');
     localStorage.removeItem('user');
     return response.data;
   },
-  
+
   getMe: async () => {
     const response = await api.get('/auth/me');
     return response.data;
@@ -64,17 +64,17 @@ export const usersAPI = {
     const response = await api.get('/users', { params });
     return response.data;
   },
-  
+
   createUser: async (userData) => {
     const response = await api.post('/users', userData);
     return response.data;
   },
-  
+
   updateUser: async (userId, userData) => {
     const response = await api.put(`/users/${userId}`, userData);
     return response.data;
   },
-  
+
   deleteUser: async (userId) => {
     const response = await api.delete(`/users/${userId}`);
     return response.data;
@@ -87,17 +87,17 @@ export const productsAPI = {
     const response = await api.get('/products', { params });
     return response.data;
   },
-  
+
   createProduct: async (productData) => {
     const response = await api.post('/products', productData);
     return response.data;
   },
-  
+
   getProduct: async (productId) => {
     const response = await api.get(`/products/${productId}`);
     return response.data;
   },
-  
+
   getProductByBarcode: async (barcode) => {
     try {
       const response = await api.get(`/products/barcode/${barcode}`);
@@ -109,12 +109,12 @@ export const productsAPI = {
       throw error;
     }
   },
-  
+
   updateProduct: async (productId, productData) => {
     const response = await api.put(`/products/${productId}`, productData);
     return response.data;
   },
-  
+
   deleteProduct: async (productId) => {
     const response = await api.delete(`/products/${productId}`);
     return response.data;
@@ -127,12 +127,12 @@ export const stockAPI = {
     const response = await api.get('/stock/movements', { params });
     return response.data;
   },
-  
+
   createMovement: async (movementData) => {
     const response = await api.post('/stock/movement', movementData);
     return response.data;
   },
-  
+
   getLowStockProducts: async () => {
     const response = await api.get('/stock/low');
     return response.data;
@@ -145,22 +145,31 @@ export const salesAPI = {
     const response = await api.get('/sales', { params });
     return response.data;
   },
-  
+
   createSale: async (saleData) => {
     const response = await api.post('/sales', saleData);
     return response.data;
   },
-  
+
   getSale: async (saleId) => {
     const response = await api.get(`/sales/${saleId}`);
     return response.data;
   },
-  
+
   getDailyReport: async (date) => {
     const response = await api.get('/sales/reports/daily', {
       params: date ? { date: date.toISOString() } : {}
     });
     return response.data;
+  },
+
+  // Download İrsaliye PDF for a given date range
+  downloadIrsaliyePDF: async ({ start_date, end_date }) => {
+    const response = await api.get('/sales/reports/irsaliye', {
+      params: { start_date, end_date },
+      responseType: 'blob'
+    });
+    return response.data; // Blob
   }
 };
 
@@ -170,14 +179,14 @@ export const dashboardAPI = {
     const response = await api.get('/dashboard/stats');
     return response.data;
   },
-  
+
   getTopProducts: async (limit = 5) => {
     const response = await api.get('/dashboard/top-products', {
       params: { limit }
     });
     return response.data;
   },
-  
+
   getCashierPerformance: async () => {
     const response = await api.get('/dashboard/cashier-performance');
     return response.data;

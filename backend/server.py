@@ -1,4 +1,5 @@
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 from pathlib import Path
@@ -27,8 +28,8 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
-    title="Elektrik Dükkanı Stok Yönetim Sistemi",
-    description="Elektrikçi dükkanı için stok ve satış yönetim sistemi",
+    title="Malatya Avize Aydınlatma - Stok ve Satış Sistemi",
+    description="Malatya Avize Aydınlatma için stok ve satış yönetim sistemi",
     version="1.0.0"
 )
 
@@ -49,7 +50,7 @@ api_router = APIRouter(prefix="/api")
 # Health check
 @api_router.get("/")
 async def root():
-    return {"message": "Elektrik Dükkanı API v1.0", "status": "running"}
+    return {"message": "Malatya Avize Aydınlatma API v1.0", "status": "running"}
 
 # Authentication endpoints
 @api_router.post("/auth/login", response_model=LoginResponse)
@@ -275,6 +276,105 @@ async def get_daily_sales_report(
     current_user: User = Depends(get_current_user)
 ):
     return await SalesService.get_daily_stats(date)
+
+# Irsaliye (Monthly/Range) PDF Report
+@api_router.get("/sales/reports/irsaliye")
+async def get_irsaliye_pdf(
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    current_user: User = Depends(get_current_user)
+):
+    """Generate a PDF report in 'İrsaliye' style for the given date range.
+    If dates are omitted, defaults to current month.
+    """
+    try:
+        # Determine date range
+        now = datetime.utcnow()
+        if not start_date:
+            start_date = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if not end_date:
+            # End of month
+            if start_date.month == 12:
+                end_date = start_date.replace(year=start_date.year + 1, month=1)
+            else:
+                end_date = start_date.replace(month=start_date.month + 1)
+            end_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        sales = await SalesService.get_sales(
+            skip=0, limit=10000, start_date=start_date, end_date=end_date, cashier_id=None if current_user.role == UserRole.admin else current_user.id
+        )
+
+        # Build PDF
+        from io import BytesIO
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, leftMargin=15*mm, rightMargin=15*mm, topMargin=12*mm, bottomMargin=12*mm)
+        styles = getSampleStyleSheet()
+
+        company_name = os.getenv("COMPANY_NAME", "Malatya Avize Aydınlatma")
+        company_address = os.getenv("COMPANY_ADDRESS", "Malatya, Türkiye")
+        period_text = f"Dönem: {start_date.strftime('%d.%m.%Y')} - {(end_date - timedelta(seconds=1)).strftime('%d.%m.%Y')}"
+
+        elements = []
+        elements.append(Paragraph(f"<b>{company_name}</b>", styles['Title']))
+        elements.append(Paragraph(company_address, styles['Normal']))
+        elements.append(Spacer(1, 6))
+        elements.append(Paragraph("<b>Sevk İrsaliyesi (Aylık Rapor)</b>", styles['Heading2']))
+        elements.append(Paragraph(period_text, styles['Normal']))
+        elements.append(Spacer(1, 8))
+
+        # Table header per typical irsaliye content
+        data = [["Tarih", "Satış No", "Ürün Adedi", "Ara Toplam", "KDV", "Toplam"]]
+
+        total_sub = 0.0
+        total_tax = 0.0
+        total_sum = 0.0
+
+        for s in sales:
+            item_count = sum([i.quantity for i in s.items])
+            data.append([
+                s.created_at.strftime('%d.%m.%Y %H:%M'),
+                s.id[-8:],
+                item_count,
+                f"{s.subtotal:,.2f}",
+                f"{s.tax_amount:,.2f}",
+                f"{s.total:,.2f}",
+            ])
+            total_sub += s.subtotal
+            total_tax += s.tax_amount
+            total_sum += s.total
+
+        # totals row
+        data.append(["", "TOPLAMLAR", "", f"{total_sub:,.2f}", f"{total_tax:,.2f}", f"{total_sum:,.2f}"])
+
+        table = Table(data, repeatRows=1)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.black),
+            ('ALIGN', (2,1), (-1,-1), 'RIGHT'),
+            ('GRID', (0,0), (-1,-1), 0.25, colors.grey),
+            ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0,0), (-1,0), 6),
+        ]))
+        elements.append(table)
+
+        elements.append(Spacer(1, 12))
+        elements.append(Paragraph("Not: Bu çıktı sevk irsaliyesi formatında aylık satış özetidir.", styles['Italic']))
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        filename = f"irsaliye_{start_date.strftime('%Y-%m')}.pdf"
+        headers = {"Content-Disposition": f"attachment; filename={filename}"}
+        return StreamingResponse(buffer, media_type="application/pdf", headers=headers)
+    except Exception as e:
+        logger.error(f"Irsaliye PDF generation error: {e}")
+        raise HTTPException(status_code=500, detail="Could not generate PDF")
 
 # Dashboard endpoints
 @api_router.get("/dashboard/stats", response_model=DashboardStats)

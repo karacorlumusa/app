@@ -36,9 +36,9 @@ const Login = () => {
             <Store className="h-6 w-6 text-white" />
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
-            Elektrik Dükkanı
+            Malatya Avize Aydınlatma
           </CardTitle>
-          <p className="text-gray-600">Stok Yönetim Sistemi</p>
+          <p className="text-gray-600">Stok ve Satış Sistemi</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <form onSubmit={handleSubmit} className="space-y-4">

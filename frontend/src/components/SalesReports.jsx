@@ -54,6 +54,25 @@ const SalesReports = () => {
     }
   };
 
+  const handleDownloadIrsaliye = async () => {
+    try {
+      const startISO = toISOStart(dateRange.start);
+      const endISO = toISOEnd(dateRange.end);
+      const blob = await salesAPI.downloadIrsaliyePDF({ start_date: startISO, end_date: endISO });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `irsaliye_${dateRange.start}_${dateRange.end}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('İrsaliye PDF indirilemedi', err);
+      toast({ title: 'PDF indirilemedi', description: 'İrsaliye oluşturma sırasında hata oluştu', variant: 'destructive' });
+    }
+  };
+
   const fetchCashierPerformance = async () => {
     try {
       const perf = await dashboardAPI.getCashierPerformance();
@@ -276,12 +295,18 @@ const SalesReports = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h1 className="text-3xl font-bold">Satış Raporları</h1>
-        <Button onClick={handleExportCSV} disabled={loading || filteredSales.length === 0}>
-          <Download className="h-4 w-4 mr-2" />
-          Rapor İndir
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleDownloadIrsaliye} disabled={loading}>
+            <Download className="h-4 w-4 mr-2" />
+            İrsaliye (PDF)
+          </Button>
+          <Button onClick={handleExportCSV} disabled={loading || filteredSales.length === 0}>
+            <Download className="h-4 w-4 mr-2" />
+            CSV İndir
+          </Button>
+        </div>
       </div>
 
       {/* Date Range Filter */}

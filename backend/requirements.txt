@@ -12,3 +12,4 @@ python-multipart>=0.0.9
 cryptography>=42.0.8
 tzdata>=2024.2
 requests>=2.31.0
+reportlab>=4.2.5
