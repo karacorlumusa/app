@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Package,
   Plus,
@@ -23,12 +23,7 @@ const StockManagement = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const { toast } = useToast();
 
-  useEffect(() => {
-    loadProducts();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm]);
-
-  const loadProducts = async () => {
+  const loadProducts = useCallback(async () => {
     try {
       setLoading(true);
       const params = {};
@@ -41,7 +36,11 @@ const StockManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchTerm, toast]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   const filteredProducts = products.filter((product) => {
     const term = searchTerm.toLowerCase();
@@ -68,7 +67,7 @@ const StockManagement = () => {
     const [supplier, setSupplier] = useState(product?.supplier || '');
     const [note, setNote] = useState('');
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
       e.preventDefault();
 
       if (!quantity || quantity <= 0) {
