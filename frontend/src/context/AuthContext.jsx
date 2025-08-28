@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('access_token', data.access_token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setUser(data.user);
-      return { success: true };
+      return { success: true, user: data.user };
     } catch (error) {
       const message = error?.response?.data?.detail || error?.message || 'Giriş başarısız';
       // Cleanup any partial state

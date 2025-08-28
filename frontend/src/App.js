@@ -10,8 +10,10 @@ import {
   LogOut,
   Menu,
   X,
-  Store
+  Store,
+  LampCeiling
 } from "lucide-react";
+import { Users } from "lucide-react";
 import { Button } from "./components/ui/button";
 import { Toaster } from "./components/ui/toaster";
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -50,7 +52,7 @@ function AppContent() {
     {
       path: '/users',
       name: 'Kullanıcılar',
-      icon: LayoutDashboard,
+      icon: Users,
       component: UsersManagement
     },
     {
@@ -95,7 +97,7 @@ function AppContent() {
     <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform lg:translate-x-0 lg:static lg:inset-0`}>
       <div className="flex items-center justify-between h-16 px-6 bg-gray-800">
         <div className="flex items-center gap-2">
-          <Store className="h-8 w-8 text-blue-400" />
+          <LampCeiling className="h-8 w-8 text-blue-400" />
           <span className="text-white font-bold">Malatya Avize Aydınlatma</span>
         </div>
         <Button
@@ -207,8 +209,6 @@ function AppContent() {
 
   return (
     <BrowserRouter>
-      {/* Always mount Toaster once to avoid portal churn */}
-      <Toaster />
       {loading ? (
         LoadingScreen
       ) : (
@@ -221,7 +221,15 @@ function AppContent() {
           {/* Everything else requires auth */}
           <Route
             path="/*"
-            element={user ? AuthedLayout : <Navigate to="/login" replace />}
+            element={user ? (
+              <>
+                {/** Mount toasts only in authed area to avoid login portal issues */}
+                <Toaster />
+                {AuthedLayout}
+              </>
+            ) : (
+              <Navigate to="/login" replace />
+            )}
           />
         </Routes>
       )}

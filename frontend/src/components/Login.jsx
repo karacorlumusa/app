@@ -6,6 +6,7 @@ import { Label } from './ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -13,15 +14,20 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError('');
 
     const result = await login({ username, password });
 
-    if (!result.success) {
+    if (result.success && result.user) {
+      const defaultPath = result.user.role === 'admin' ? '/dashboard' : '/sales';
+      navigate(defaultPath, { replace: true });
+    } else if (!result.success) {
       setError(result.error);
     }
 

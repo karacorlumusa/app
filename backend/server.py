@@ -174,10 +174,21 @@ async def update_product(
     product_update: ProductUpdate,
     current_user: User = Depends(get_current_admin_user)
 ):
-    product = await ProductService.update_product(product_id, product_update)
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    return product
+    try:
+        product = await ProductService.update_product(product_id, product_update)
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        return product
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/products/generate-barcode")
+async def generate_barcode(
+    current_user: User = Depends(get_current_admin_user)
+):
+    """Generate a unique barcode on the server side."""
+    code = await ProductService.generate_unique_barcode()
+    return {"barcode": code}
 
 @api_router.delete("/products/{product_id}")
 async def delete_product(

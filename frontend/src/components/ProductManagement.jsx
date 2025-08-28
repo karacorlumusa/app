@@ -1,21 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
-  Package, 
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import {
+  Plus,
+  Search,
+  Edit,
+  Trash2,
+  Package,
   AlertTriangle,
   Filter,
   Download,
   Upload
 } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { productsAPI } from '../services/api';
+import JsBarcode from 'jsbarcode';
 import { useToast } from '../hooks/use-toast';
 
 const ProductManagement = () => {
@@ -36,19 +38,19 @@ const ProductManagement = () => {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      
+
       const params = {};
       if (searchTerm) params.search = searchTerm;
       if (categoryFilter !== 'all') params.category = categoryFilter;
       if (stockFilter === 'low') params.low_stock = true;
-      
+
       const data = await productsAPI.getProducts(params);
       setProducts(data);
-      
+
       // Extract unique categories
       const uniqueCategories = [...new Set(data.map(p => p.category))];
       setCategories(uniqueCategories);
-      
+
     } catch (error) {
       console.error('Failed to load products:', error);
       toast({
@@ -101,6 +103,60 @@ const ProductManagement = () => {
     }
   };
 
+  const printProductBarcode = (product) => {
+    if (!product?.barcode) {
+      toast({ title: 'Barkod yok', description: 'Bu üründe barkod bulunmuyor', variant: 'destructive' });
+      return;
+    }
+    // Build SVG markup with JsBarcode into a detached SVG element
+    const tempSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    try {
+      JsBarcode(tempSvg, String(product.barcode), {
+        format: 'CODE128',
+        lineColor: '#000',
+        width: 2,
+        height: 60,
+        displayValue: true,
+        font: 'monospace',
+        fontSize: 14,
+        textMargin: 2,
+        margin: 8
+      });
+    } catch (e) {
+      console.warn('Barcode render failed', e);
+      toast({ title: 'Barkod oluşturulamadı', description: 'Yazdırma sırasında hata oluştu', variant: 'destructive' });
+      return;
+    }
+    const win = window.open('', 'PRINT', 'height=600,width=400');
+    if (!win) return;
+    const style = `
+      <style>
+        @page { size: auto; margin: 8mm; }
+        body { font-family: Arial, sans-serif; }
+        .label { display: flex; flex-direction: column; align-items: center; }
+        .name { font-size: 14px; font-weight: 600; margin-bottom: 6px; text-align: center; }
+        .price { font-size: 12px; margin-top: 4px; }
+        svg { width: 280px; height: auto; }
+      </style>
+    `;
+    const name = product.name || '';
+    const price = product.sell_price ? `${formatCurrency(product.sell_price)}` : '';
+    win.document.write(`<!DOCTYPE html><html><head><title>Barkod Yazdır</title>${style}</head><body>`);
+    win.document.write(`<div class="label">`);
+    win.document.write(`<div class="name">${name}</div>`);
+    win.document.write(tempSvg.outerHTML);
+    if (price) {
+      win.document.write(`<div class="price">${price}</div>`);
+    }
+    win.document.write(`</div></body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+      win.close();
+    }, 100);
+  };
+
   const ProductForm = ({ product, onClose }) => {
     const [formData, setFormData] = useState(product || {
       barcode: '',
@@ -115,11 +171,50 @@ const ProductManagement = () => {
       supplier: ''
     });
     const [saving, setSaving] = useState(false);
+    const existingBarcodes = useMemo(() => new Set(products.map(p => String(p.barcode))), [products]);
+    const barcodeInputRef = useRef(null);
+
+    const generateUniqueBarcode = () => {
+      // Generate a CODE128-friendly numeric code, check against existing barcodes
+      // Pattern: 869 + epoch ms last 9 digits + 2 random digits => length ~14-15
+      // Using CODE128 so length is flexible and checksum not required
+      const random2 = Math.floor(Math.random() * 90 + 10); // 10-99
+      const ms = Date.now().toString().slice(-9);
+      let candidate = `869${ms}${random2}`;
+
+      // Ensure uniqueness within current list; loop a few times if needed
+      let attempts = 0;
+      while (existingBarcodes.has(candidate) && attempts < 5) {
+        const r = Math.floor(Math.random() * 9000 + 1000);
+        candidate = `869${Date.now().toString().slice(-8)}${r}`;
+        attempts++;
+      }
+      return candidate;
+    };
+
+    const handleGenerateBarcode = () => {
+      const code = generateUniqueBarcode();
+      // Update state (controlled input)
+      setFormData(prev => ({ ...prev, barcode: code }));
+      // Also force the input DOM value for instant visual feedback
+      setTimeout(() => {
+        if (barcodeInputRef.current) {
+          barcodeInputRef.current.value = code;
+          try {
+            barcodeInputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
+            // Nudge browsers to reflect the programmatic change
+            barcodeInputRef.current.blur();
+            barcodeInputRef.current.focus();
+          } catch { }
+        }
+      }, 0);
+      toast({ title: 'Barkod oluşturuldu', description: code });
+    };
 
     const handleSubmit = async (e) => {
       e.preventDefault();
       setSaving(true);
-      
+
       try {
         if (product) {
           // Edit existing product
@@ -136,7 +231,7 @@ const ProductManagement = () => {
             description: "Yeni ürün başarıyla eklendi.",
           });
         }
-        
+
         onClose();
         loadProducts();
       } catch (error) {
@@ -162,29 +257,42 @@ const ProductManagement = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Barkod</label>
-                  <Input
-                    value={formData.barcode}
-                    onChange={(e) => setFormData({...formData, barcode: e.target.value})}
-                    placeholder="Barkod numarası"
-                    required
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      key={formData.barcode || 'barcode-input'}
+                      ref={barcodeInputRef}
+                      type="text"
+                      autoComplete="off"
+                      name="barcode"
+                      value={formData.barcode}
+                      onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                      placeholder="Barkod numarası"
+                      required
+                      className="flex-1"
+                    />
+                    {!product && (
+                      <Button type="button" variant="secondary" onClick={handleGenerateBarcode}>
+                        Barkod Oluştur
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-1">Ürün Adı</label>
                   <Input
                     value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Ürün adı"
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-1">Kategori</label>
                   <Input
                     value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     placeholder="Kategori"
                     list="categories"
                     required
@@ -195,72 +303,72 @@ const ProductManagement = () => {
                     ))}
                   </datalist>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-1">Marka</label>
                   <Input
                     value={formData.brand}
-                    onChange={(e) => setFormData({...formData, brand: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
                     placeholder="Marka adı"
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-1">Stok Miktarı</label>
                   <Input
                     type="number"
                     value={formData.stock}
-                    onChange={(e) => setFormData({...formData, stock: parseInt(e.target.value) || 0})}
+                    onChange={(e) => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
                     placeholder="Stok adedi"
                     min="0"
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-1">Minimum Stok</label>
                   <Input
                     type="number"
                     value={formData.min_stock}
-                    onChange={(e) => setFormData({...formData, min_stock: parseInt(e.target.value) || 0})}
+                    onChange={(e) => setFormData({ ...formData, min_stock: parseInt(e.target.value) || 0 })}
                     placeholder="Minimum stok adedi"
                     min="0"
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-1">Alış Fiyatı (₺)</label>
                   <Input
                     type="number"
                     step="0.01"
                     value={formData.buy_price}
-                    onChange={(e) => setFormData({...formData, buy_price: parseFloat(e.target.value) || 0})}
+                    onChange={(e) => setFormData({ ...formData, buy_price: parseFloat(e.target.value) || 0 })}
                     placeholder="Alış fiyatı"
                     min="0"
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-1">Satış Fiyatı (₺)</label>
                   <Input
                     type="number"
                     step="0.01"
                     value={formData.sell_price}
-                    onChange={(e) => setFormData({...formData, sell_price: parseFloat(e.target.value) || 0})}
+                    onChange={(e) => setFormData({ ...formData, sell_price: parseFloat(e.target.value) || 0 })}
                     placeholder="Satış fiyatı"
                     min="0"
                     required
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-1">KDV Oranı (%)</label>
                   <select
                     value={formData.tax_rate}
-                    onChange={(e) => setFormData({...formData, tax_rate: parseInt(e.target.value)})}
+                    onChange={(e) => setFormData({ ...formData, tax_rate: parseInt(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value={1}>%1</option>
@@ -268,12 +376,12 @@ const ProductManagement = () => {
                     <option value={18}>%18</option>
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium mb-1">Tedarikçi</label>
                   <Input
                     value={formData.supplier || ''}
-                    onChange={(e) => setFormData({...formData, supplier: e.target.value})}
+                    onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
                     placeholder="Tedarikçi adı"
                   />
                 </div>
@@ -317,7 +425,7 @@ const ProductManagement = () => {
                 className="pl-10"
               />
             </div>
-            
+
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
@@ -328,7 +436,7 @@ const ProductManagement = () => {
                 <option key={category} value={category}>{category}</option>
               ))}
             </select>
-            
+
             <select
               value={stockFilter}
               onChange={(e) => setStockFilter(e.target.value)}
@@ -420,6 +528,14 @@ const ProductManagement = () => {
                             onClick={() => handleDeleteProduct(product)}
                           >
                             <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => printProductBarcode(product)}
+                            title="Barkodu Yazdır"
+                          >
+                            <Printer className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>

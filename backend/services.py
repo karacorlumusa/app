@@ -59,14 +59,34 @@ class UserService:
 
 class ProductService:
     @staticmethod
+    async def generate_unique_barcode(prefix: str = "869") -> str:
+        """Generate a unique barcode not present in DB (CODE128-friendly)."""
+        import random, time
+        attempts = 0
+        while attempts < 10:
+            ms = str(int(time.time() * 1000))[-9:]
+            rand = str(random.randint(10, 99))
+            candidate = f"{prefix}{ms}{rand}"
+            existing = await find_one("products", {"barcode": candidate})
+            if not existing:
+                return candidate
+            attempts += 1
+        # Fallback very unlikely collision case
+        return f"{prefix}{uuid.uuid4().hex[:10]}"
+
+    @staticmethod
     async def create_product(product_data: ProductCreate) -> Product:
         """Create a new product"""
+        # Normalize barcode
+        normalized_barcode = str(product_data.barcode).strip()
         # Check if barcode already exists
-        existing_product = await find_one("products", {"barcode": product_data.barcode})
+        existing_product = await find_one("products", {"barcode": normalized_barcode})
         if existing_product:
             raise ValueError("Barcode already exists")
-        
-        product = Product(**product_data.dict())
+        # Build product with normalized barcode
+        data = product_data.dict()
+        data["barcode"] = normalized_barcode
+        product = Product(**data)
         await insert_one("products", product.dict())
         
         return product
@@ -114,6 +134,12 @@ class ProductService:
     async def update_product(product_id: str, product_update: ProductUpdate) -> Optional[Product]:
         """Update product"""
         update_dict = {k: v for k, v in product_update.dict().items() if v is not None}
+        # Normalize and check barcode uniqueness if changing
+        if "barcode" in update_dict:
+            update_dict["barcode"] = str(update_dict["barcode"]).strip()
+            other = await find_one("products", {"barcode": update_dict["barcode"]})
+            if other and other.get("id") != product_id:
+                raise ValueError("Barcode already exists")
         
         success = await update_one("products", {"id": product_id}, update_dict)
         if success:
