@@ -49,7 +49,7 @@ services:
     volumes:
       - ./frontend:/app/frontend
       - /app/frontend/node_modules
-    command: yarn start
+  command: sh -c "yarn install && yarn start"
 
 volumes:
   mongo_data:
