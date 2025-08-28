@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
-import { 
-  Package, 
-  Plus, 
-  TrendingUp, 
-  TrendingDown, 
+import React, { useEffect, useState } from 'react';
+import {
+  Package,
+  Plus,
+  TrendingUp,
+  TrendingDown,
   Search,
-  Calendar,
-  FileText,
   AlertTriangle
 } from 'lucide-react';
 import { Button } from './ui/button';
@@ -14,23 +12,47 @@ import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { mockProducts } from '../mock/mockData';
 import { useToast } from '../hooks/use-toast';
+import { productsAPI } from '../services/api';
 
 const StockManagement = () => {
-  const [products, setProducts] = useState(mockProducts);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showStockForm, setShowStockForm] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const { toast } = useToast();
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.barcode.includes(searchTerm) ||
-    product.brand.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    loadProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm]);
 
-  const lowStockProducts = products.filter(product => product.stock <= product.minStock);
+  const loadProducts = async () => {
+    try {
+      setLoading(true);
+      const params = {};
+      if (searchTerm) params.search = searchTerm;
+      const data = await productsAPI.getProducts(params);
+      setProducts(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Stok ürünleri yüklenemedi:', err);
+      toast({ title: 'Hata', description: 'Stok ürünleri yüklenemedi', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredProducts = products.filter((product) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      product.name?.toLowerCase().includes(term) ||
+      String(product.barcode || '').includes(searchTerm) ||
+      product.brand?.toLowerCase().includes(term)
+    );
+  });
+
+  const lowStockProducts = products.filter((product) => product.stock <= (product.min_stock ?? 0));
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('tr-TR', {
@@ -42,13 +64,13 @@ const StockManagement = () => {
   const StockEntryForm = ({ product, onClose }) => {
     const [entryType, setEntryType] = useState('in'); // 'in' for stock in, 'out' for stock out
     const [quantity, setQuantity] = useState('');
-    const [unitPrice, setUnitPrice] = useState(product?.buyPrice || '');
+    const [unitPrice, setUnitPrice] = useState(product?.buy_price ?? '');
     const [supplier, setSupplier] = useState(product?.supplier || '');
     const [note, setNote] = useState('');
 
     const handleSubmit = (e) => {
       e.preventDefault();
-      
+
       if (!quantity || quantity <= 0) {
         toast({
           title: "Geçersiz miktar",
@@ -59,29 +81,34 @@ const StockManagement = () => {
       }
 
       const quantityNum = parseInt(quantity);
-      const newStock = entryType === 'in' 
-        ? product.stock + quantityNum 
-        : Math.max(0, product.stock - quantityNum);
+      const newStock = entryType === 'in'
+        ? (product.stock || 0) + quantityNum
+        : Math.max(0, (product.stock || 0) - quantityNum);
 
-      // Update product stock
-      setProducts(products.map(p => 
-        p.id === product.id 
-          ? { 
-              ...p, 
-              stock: newStock,
-              buyPrice: entryType === 'in' && unitPrice ? parseFloat(unitPrice) : p.buyPrice,
-              supplier: supplier || p.supplier,
-              lastUpdated: new Date().toISOString()
-            }
-          : p
-      ));
+      try {
+        // Persist by updating the product stock (and optionally buy price/supplier on stock-in)
+        const payload = {
+          stock: newStock,
+        };
+        if (entryType === 'in') {
+          if (unitPrice !== '' && !Number.isNaN(parseFloat(unitPrice))) {
+            payload.buy_price = parseFloat(unitPrice);
+          }
+          if (supplier) payload.supplier = supplier;
+        }
+        await productsAPI.updateProduct(product.id, payload);
 
-      toast({
-        title: entryType === 'in' ? "Stok girişi yapıldı" : "Stok çıkışı yapıldı",
-        description: `${product.name}: ${quantityNum} adet ${entryType === 'in' ? 'eklendi' : 'çıkarıldı'}`,
-      });
+        toast({
+          title: entryType === 'in' ? 'Stok girişi yapıldı' : 'Stok çıkışı yapıldı',
+          description: `${product.name}: ${quantityNum} adet ${entryType === 'in' ? 'eklendi' : 'çıkarıldı'}`,
+        });
 
-      onClose();
+        await loadProducts();
+        onClose();
+      } catch (err) {
+        console.error('Stok güncellenemedi:', err);
+        toast({ title: 'Hata', description: 'Stok güncellenemedi', variant: 'destructive' });
+      }
     };
 
     return (
@@ -219,7 +246,11 @@ const StockManagement = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {filteredProducts.length === 0 ? (
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <Alert>
               <Package className="h-4 w-4" />
               <AlertDescription>
@@ -242,8 +273,8 @@ const StockManagement = () => {
                 </thead>
                 <tbody>
                   {filteredProducts.map((product) => {
-                    const stockStatus = product.stock <= product.minStock ? 'critical' : 'normal';
-                    
+                    const stockStatus = product.stock <= (product.min_stock ?? 0) ? 'critical' : 'normal';
+
                     return (
                       <tr key={product.id} className="border-b hover:bg-gray-50">
                         <td className="py-3">
@@ -260,13 +291,13 @@ const StockManagement = () => {
                             {product.stock} adet
                           </span>
                         </td>
-                        <td className="py-3">{product.minStock} adet</td>
+                        <td className="py-3">{product.min_stock} adet</td>
                         <td className="py-3">
                           <Badge variant={stockStatus === 'critical' ? 'destructive' : 'default'}>
                             {stockStatus === 'critical' ? 'Kritik' : 'Normal'}
                           </Badge>
                         </td>
-                        <td className="py-3">{formatCurrency(product.buyPrice)}</td>
+                        <td className="py-3">{formatCurrency(product.buy_price || 0)}</td>
                         <td className="py-3 text-right">
                           <Button
                             variant="outline"
