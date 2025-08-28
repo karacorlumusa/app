@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "zprPM/ghM4c=",
+  "dgSpecHash": "TliqD4ZpNeM=",
   "success": true,
-  "projectFilePath": "C:\\Users\\karac\\Source\\Repos\\app\\backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj",
+  "projectFilePath": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\karac\\.nuget\\packages\\awssdk.core\\3.7.100.14\\awssdk.core.3.7.100.14.nupkg.sha512",
     "C:\\Users\\karac\\.nuget\\packages\\awssdk.securitytoken\\3.7.100.14\\awssdk.securitytoken.3.7.100.14.nupkg.sha512",

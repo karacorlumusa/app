@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\karac\\Source\\Repos\\app\\backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj": {}
+    "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj": {}
   },
   "projects": {
-    "C:\\Users\\karac\\Source\\Repos\\app\\backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj": {
+    "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\karac\\Source\\Repos\\app\\backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj",
+        "projectUniqueName": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj",
         "projectName": "MalatyaAvize.Api",
-        "projectPath": "C:\\Users\\karac\\Source\\Repos\\app\\backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj",
+        "projectPath": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj",
         "packagesPath": "C:\\Users\\karac\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\karac\\Source\\Repos\\app\\backend-dotnet\\MalatyaAvize.Api\\obj\\",
+        "outputPath": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

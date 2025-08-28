@@ -26,6 +26,10 @@ const CashierSales = ({ user }) => {
   const [currentSale, setCurrentSale] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  // Kasiyer yardım paneli: son okutulan ürün bilgisi (alış fiyatı, satış fiyatı)
+  const [lastScannedInfo, setLastScannedInfo] = useState(null); // { name, buy_price, sell_price }
+  const [revealCost, setRevealCost] = useState(false);
+  const [showHelper, setShowHelper] = useState(false); // varsayılan gizli
   const barcodeInputRef = useRef(null);
   const { toast } = useToast();
 
@@ -35,6 +39,18 @@ const CashierSales = ({ user }) => {
       barcodeInputRef.current.focus();
     }
   }, [cart]);
+
+  // Kısayol: Alt+M ile kasiyer yardım panelini aç/kapat
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.altKey && (e.key === 'm' || e.key === 'M')) {
+        e.preventDefault();
+        setShowHelper((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // Handle barcode input
   const handleBarcodeSubmit = async (e) => {
@@ -46,6 +62,12 @@ const CashierSales = ({ user }) => {
       const product = await productsAPI.getProductByBarcode(barcodeInput.trim());
       if (product) {
         addToCart(product, quantityInput);
+        // Kasiyer yardım paneline son okutulan ürünün maliyetini aktar
+        setLastScannedInfo({
+          name: product.name,
+          buy_price: product.buy_price,
+          sell_price: product.sell_price
+        });
         setBarcodeInput('');
         setQuantityInput(1);
       } else {
@@ -94,9 +116,17 @@ const CashierSales = ({ user }) => {
 
       setCart(cart.map(item =>
         item.product_id === product.id
-          ? { ...item, quantity: newQuantity, total_price: newQuantity * product.sell_price }
+          ? {
+            ...item,
+            quantity: newQuantity,
+            unit_price: product.sell_price,
+            buy_price: product.buy_price,
+            total_price: newQuantity * product.sell_price
+          }
           : item
       ));
+      // Güncel eklenen/okutulan ürün bilgisi (kasiyer yardım paneli için)
+      setLastScannedInfo({ name: product.name, buy_price: product.buy_price, sell_price: product.sell_price });
     } else {
       const cartItem = {
         product_id: product.id,
@@ -104,11 +134,14 @@ const CashierSales = ({ user }) => {
         product_name: product.name,
         quantity: quantity,
         unit_price: product.sell_price,
+        buy_price: product.buy_price,
         tax_rate: product.tax_rate,
         total_price: quantity * product.sell_price,
         available_stock: product.stock
       };
       setCart([...cart, cartItem]);
+      // Yeni ürün eklendiğinde kasiyer yardım panelini güncelle
+      setLastScannedInfo({ name: product.name, buy_price: product.buy_price, sell_price: product.sell_price });
     }
 
     toast({
@@ -229,12 +262,89 @@ const CashierSales = ({ user }) => {
   };
 
   const printReceipt = () => {
-    // In a real application, this would send to printer
-    toast({
-      title: "Fiş yazdırılıyor",
-      description: "Fiş yazıcıya gönderildi",
-    });
-    setCurrentSale(null);
+    if (!currentSale) return;
+
+    const COMPANY_NAME = process.env.REACT_APP_COMPANY_NAME || 'Malatya Avize Dünyası';
+    const COMPANY_ADDRESS = process.env.REACT_APP_COMPANY_ADDRESS || 'Malatya, Türkiye';
+    const formatDate = (dateString) => {
+      if (!dateString) return '';
+      return new Date(dateString).toLocaleDateString('tr-TR', {
+        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+    };
+
+    const rows = (currentSale.items || []).map(i => `
+      <tr>
+        <td>${i.product_name}</td>
+        <td style="text-align:right;">${i.quantity}</td>
+        <td style="text-align:right;">${formatCurrency(i.unit_price)}</td>
+        <td style="text-align:right;">${formatCurrency(i.total_price)}</td>
+      </tr>`).join('');
+
+    const title = `Satış Fişi - ${COMPANY_NAME} - ${currentSale.id || ''}`;
+    const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"/>
+      <title>${title}</title>
+      <style>
+        :root{--ink:#111;--muted:#555;--line:#ccc;--bg:#f5f5f5;--brand:#111}
+        *{box-sizing:border-box}
+        body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:var(--ink)}
+        h1{font-size:18px;margin:0 0 8px}
+        .meta{font-size:12px;color:var(--muted);margin-bottom:12px}
+        .header{display:flex;align-items:center;gap:16px;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:12px}
+        .logo{width:54px;height:54px;display:flex;align-items:center;justify-content:center;border:1px solid var(--ink);border-radius:6px}
+        .company h1{font-size:20px;margin:0}
+        .company .addr{font-size:12px;color:var(--muted)}
+        table{width:100%;border-collapse:collapse;margin-top:12px}
+        th,td{border:1px solid var(--line);padding:6px;font-size:12px}
+        th{background:var(--bg);text-align:left}
+        .totals{margin-top:12px;float:right}
+        .totals table{width:auto}
+        .stamp{margin-top:28px;border:2px dashed var(--muted);border-radius:8px;padding:12px;width:220px;text-align:center;color:var(--muted)}
+        .footer-note{margin-top:12px;font-size:11px;color:var(--muted)}
+        @media print{body{padding:0 16px}}
+      </style></head><body>
+      <div class="header">
+        <div class="logo" aria-hidden="true">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2c-3 0-5 2.5-5 5.5 0 1.7.8 3.2 2 4.2V14a3 3 0 0 0 2 2.83V20h2v-3.17A3 3 0 0 0 15 14v-2.3c1.2-1 2-2.5 2-4.2C17 4.5 15 2 12 2Z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+            <circle cx="12" cy="8" r="1.8" fill="currentColor"/>
+          </svg>
+        </div>
+        <div class="company">
+          <h1>${COMPANY_NAME}</h1>
+          <div class="addr">${COMPANY_ADDRESS}</div>
+        </div>
+      </div>
+      <div class="meta">
+        <div><strong>Belge:</strong> Satış Fişi</div>
+        <div><strong>Tarih:</strong> ${formatDate(currentSale.created_at)}</div>
+        <div><strong>Kasiyer:</strong> ${user.full_name}</div>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Ürün</th><th>Adet</th><th>Birim</th><th>Toplam</th></tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="totals">
+        <table>
+          <tr><th>Ara Toplam</th><td>${formatCurrency(currentSale.subtotal)}</td></tr>
+          <tr><th>KDV</th><td>${formatCurrency(currentSale.tax_amount)}</td></tr>
+          <tr><th>TOPLAM</th><td><strong>${formatCurrency(currentSale.total)}</strong></td></tr>
+        </table>
+      </div>
+      <div style="clear:both"></div>
+      <div class="stamp">Firma Kaşesi / İmza</div>
+      <div class="footer-note">Bu fiş ${COMPANY_NAME} tarafından düzenlenmiştir. İade/değişim işlemlerinde fiş ve kaşe ibrazı gereklidir.</div>
+      <script>window.onload=()=>{window.print(); setTimeout(()=>window.close(), 500)}</script>
+    </body></html>`;
+
+    const w = window.open('', '_blank');
+    if (w) {
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+    }
   };
 
   return (
@@ -307,7 +417,14 @@ const CashierSales = ({ user }) => {
             ) : (
               <div className="space-y-2">
                 {cart.map((item) => (
-                  <div key={item.product_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div
+                    key={item.product_id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer"
+                    onClick={() => {
+                      // Sadece bilgiyi güncelle; görünürlük kullanıcı kontrolünde kalsın
+                      setLastScannedInfo({ name: item.product_name, buy_price: item.buy_price, sell_price: item.unit_price });
+                    }}
+                  >
                     <div className="flex-1">
                       <p className="font-medium text-sm">{item.product_name}</p>
                       <p className="text-xs text-gray-500">{item.barcode}</p>
@@ -355,7 +472,7 @@ const CashierSales = ({ user }) => {
 
       {/* Right: Sale Summary & Actions */}
       <div className="space-y-4">
-        <Card>
+        <Card onDoubleClick={() => setShowHelper((v) => !v)}>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <User className="h-5 w-5" />
@@ -367,6 +484,60 @@ const CashierSales = ({ user }) => {
             <p className="text-sm text-gray-500">{user.username}</p>
           </CardContent>
         </Card>
+
+        {/* Kasiyer Yardım: Müşteriye belli etmeden maliyet görüntüleme (varsayılan gizli) */}
+        {showHelper && (
+          <Card className="border-dashed">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-sm">
+                <span className="flex items-center gap-2 text-gray-600">
+                  <Calculator className="h-4 w-4" />
+                  Kasiyer Yardım
+                </span>
+                <Button size="sm" variant="outline" onClick={() => setRevealCost(v => !v)} title="Maliyeti göster/gizle">
+                  {revealCost ? 'Gizle' : 'Göster'}
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {lastScannedInfo ? (
+                <div className="text-xs space-y-1">
+                  <div className="text-gray-500">Son Ürün:</div>
+                  <div className="font-medium truncate" title={lastScannedInfo.name}>{lastScannedInfo.name}</div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600">M:</span>
+                    <span className="font-semibold">
+                      {revealCost && (lastScannedInfo.buy_price ?? 0) > 0 ? (
+                        formatCurrency(lastScannedInfo.buy_price)
+                      ) : (
+                        '•••'
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-gray-500">
+                    <span>Satış:</span>
+                    <span>{formatCurrency(lastScannedInfo.sell_price || 0)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-gray-500">
+                    <span>Marj:</span>
+                    <span>
+                      {(() => {
+                        const b = Number(lastScannedInfo.buy_price) || 0;
+                        const s = Number(lastScannedInfo.sell_price) || 0;
+                        if (b <= 0 || s <= 0) return '—';
+                        const pct = ((s - b) / b) * 100;
+                        return `%${pct.toFixed(1)}`;
+                      })()}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-2">Not: Bu bölüm müşteriye açıklanmaz. (Alt+M ile aç/kapat)</p>
+                </div>
+              ) : (
+                <p className="text-xs text-gray-500">Barkod okutulduğunda maliyet burada görünecek.</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>
