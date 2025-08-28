@@ -1,4 +1,4 @@
-# Malatya Avize Aydınlatma - API Contracts
+# Malatya Avize Dünyası - API Contracts
 
 ## Backend API Endpoints
 

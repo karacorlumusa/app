@@ -9,40 +9,33 @@ services:
     environment:
       MONGO_INITDB_DATABASE: elektrik_dukkani
 
-  backend:
+  backend_dotnet:
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: backend-dotnet/Dockerfile
     depends_on:
       - mongo
     restart: unless-stopped
-    env_file:
-      - backend/.env
     environment:
-      # Ensure Python sends logs unbuffered
-      - PYTHONUNBUFFERED=1
-      # If .env overrides are missing, provide sensible defaults
       - MONGO_URL=mongodb://mongo:27017
       - DB_NAME=elektrik_dukkani
-      - SECRET_KEY=${SECRET_KEY:-change-me-in-prod}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+      - SECRET_KEY=change-me-in-prod
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - ASPNETCORE_ENVIRONMENT=Development
     ports:
-      - "127.0.0.1:8000:8000"
-    volumes:
-      - ./backend:/app/backend
-    command: uvicorn backend.server:app --host 0.0.0.0 --port 8000
+      - "127.0.0.1:8001:8001"
 
   frontend:
     build:
       context: .
       dockerfile: frontend/Dockerfile
     depends_on:
-      - backend
+      - backend_dotnet
     restart: unless-stopped
     environment:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
-      - REACT_APP_BACKEND_URL=http://localhost:8000
+      - REACT_APP_BACKEND_URL=http://localhost:8001
       - BROWSER=none
     ports:
       - "127.0.0.1:3000:3000"

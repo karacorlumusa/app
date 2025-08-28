@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 const API_BASE_URL = `${BACKEND_URL}/api`;
 
 // Create axios instance
@@ -86,6 +86,12 @@ export const productsAPI = {
   getProducts: async (params = {}) => {
     const response = await api.get('/products', { params });
     return response.data;
+  },
+
+  // Generate a unique barcode from the backend
+  generateBarcode: async () => {
+    const response = await api.get('/products/generate-barcode');
+    return response.data?.barcode || null;
   },
 
   createProduct: async (productData) => {

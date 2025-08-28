@@ -172,43 +172,54 @@ const ProductManagement = () => {
     });
     const [saving, setSaving] = useState(false);
     const existingBarcodes = useMemo(() => new Set(products.map(p => String(p.barcode))), [products]);
-    const barcodeInputRef = useRef(null);
+    const barcodeRef = useRef(null);
 
-    const generateUniqueBarcode = () => {
-      // Generate a CODE128-friendly numeric code, check against existing barcodes
-      // Pattern: 869 + epoch ms last 9 digits + 2 random digits => length ~14-15
-      // Using CODE128 so length is flexible and checksum not required
-      const random2 = Math.floor(Math.random() * 90 + 10); // 10-99
-      const ms = Date.now().toString().slice(-9);
-      let candidate = `869${ms}${random2}`;
-
-      // Ensure uniqueness within current list; loop a few times if needed
-      let attempts = 0;
-      while (existingBarcodes.has(candidate) && attempts < 5) {
-        const r = Math.floor(Math.random() * 9000 + 1000);
-        candidate = `869${Date.now().toString().slice(-8)}${r}`;
-        attempts++;
-      }
-      return candidate;
-    };
-
-    const handleGenerateBarcode = () => {
-      const code = generateUniqueBarcode();
-      // Update state (controlled input)
-      setFormData(prev => ({ ...prev, barcode: code }));
-      // Also force the input DOM value for instant visual feedback
-      setTimeout(() => {
-        if (barcodeInputRef.current) {
-          barcodeInputRef.current.value = code;
-          try {
-            barcodeInputRef.current.dispatchEvent(new Event('input', { bubbles: true }));
-            // Nudge browsers to reflect the programmatic change
-            barcodeInputRef.current.blur();
-            barcodeInputRef.current.focus();
-          } catch { }
+    const handleGenerateBarcode = async () => {
+      try {
+        // Prefer backend-generated unique barcode (server enforces uniqueness)
+        const code = await productsAPI.generateBarcode();
+        if (!code) throw new Error('Barkod alınamadı');
+        // Update state (controlled input)
+        const codeStr = String(code);
+        setFormData(prev => ({ ...prev, barcode: codeStr }));
+        // Best-effort: also copy to clipboard and ensure the input visually reflects the value immediately
+        try { await navigator.clipboard.writeText(codeStr); } catch { }
+        setTimeout(() => {
+          if (barcodeRef.current) {
+            barcodeRef.current.value = codeStr;
+            barcodeRef.current.focus();
+            // move caret to end
+            const el = barcodeRef.current;
+            const len = codeStr.length;
+            try { el.setSelectionRange(len, len); } catch { }
+          }
+        }, 0);
+        toast({ title: 'Barkod oluşturuldu', description: codeStr });
+      } catch (err) {
+        // Fallback to client-side generator if backend not available
+        const random2 = Math.floor(Math.random() * 90 + 10);
+        const ms = Date.now().toString().slice(-9);
+        let candidate = `869${ms}${random2}`;
+        let attempts = 0;
+        while (existingBarcodes.has(candidate) && attempts < 5) {
+          const r = Math.floor(Math.random() * 9000 + 1000);
+          candidate = `869${Date.now().toString().slice(-8)}${r}`;
+          attempts++;
         }
-      }, 0);
-      toast({ title: 'Barkod oluşturuldu', description: code });
+        const codeStr = String(candidate);
+        setFormData(prev => ({ ...prev, barcode: codeStr }));
+        try { await navigator.clipboard.writeText(codeStr); } catch { }
+        setTimeout(() => {
+          if (barcodeRef.current) {
+            barcodeRef.current.value = codeStr;
+            barcodeRef.current.focus();
+            const el = barcodeRef.current;
+            const len = codeStr.length;
+            try { el.setSelectionRange(len, len); } catch { }
+          }
+        }, 0);
+        toast({ title: 'Barkod oluşturuldu (yerel)', description: codeStr });
+      }
     };
 
     const handleSubmit = async (e) => {
@@ -259,8 +270,7 @@ const ProductManagement = () => {
                   <label className="block text-sm font-medium mb-1">Barkod</label>
                   <div className="flex gap-2">
                     <Input
-                      key={formData.barcode || 'barcode-input'}
-                      ref={barcodeInputRef}
+                      ref={barcodeRef}
                       type="text"
                       autoComplete="off"
                       name="barcode"
@@ -271,7 +281,7 @@ const ProductManagement = () => {
                       className="flex-1"
                     />
                     {!product && (
-                      <Button type="button" variant="secondary" onClick={handleGenerateBarcode}>
+                      <Button type="button" variant="secondary" onClick={handleGenerateBarcode} title="Barkod oluştur ve alana yapıştır">
                         Barkod Oluştur
                       </Button>
                     )}
@@ -352,16 +362,17 @@ const ProductManagement = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Satış Fiyatı (₺)</label>
+                  <label className="block text-sm font-medium mb-1">Satış Fiyatı (KDV Dahil) (₺)</label>
                   <Input
                     type="number"
                     step="0.01"
                     value={formData.sell_price}
                     onChange={(e) => setFormData({ ...formData, sell_price: parseFloat(e.target.value) || 0 })}
-                    placeholder="Satış fiyatı"
+                    placeholder="Satış fiyatı (KDV dahil)"
                     min="0"
                     required
                   />
+                  <p className="mt-1 text-xs text-gray-500">Bu alan KDV dahil fiyatı temsil eder.</p>
                 </div>
 
                 <div>
@@ -479,7 +490,7 @@ const ProductManagement = () => {
                     <th className="text-left py-2">Barkod</th>
                     <th className="text-left py-2">Stok</th>
                     <th className="text-left py-2">Alış Fiyatı</th>
-                    <th className="text-left py-2">Satış Fiyatı</th>
+                    <th className="text-left py-2">Satış Fiyatı (KDV Dahil)</th>
                     <th className="text-left py-2">Kar Marjı</th>
                     <th className="text-right py-2">İşlemler</th>
                   </tr>

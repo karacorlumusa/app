@@ -98,7 +98,7 @@ function AppContent() {
       <div className="flex items-center justify-between h-16 px-6 bg-gray-800">
         <div className="flex items-center gap-2">
           <LampCeiling className="h-8 w-8 text-blue-400" />
-          <span className="text-white font-bold">Malatya Avize Aydınlatma</span>
+          <span className="text-white font-bold">Malatya Avize Dünyası</span>
         </div>
         <Button
           variant="ghost"

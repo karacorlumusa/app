@@ -42,7 +42,7 @@ const Login = () => {
             <Store className="h-6 w-6 text-white" />
           </div>
           <CardTitle className="text-2xl font-bold text-gray-900">
-            Malatya Avize Aydınlatma
+            Malatya Avize Dünyası
           </CardTitle>
           <p className="text-gray-600">Stok ve Satış Sistemi</p>
         </CardHeader>

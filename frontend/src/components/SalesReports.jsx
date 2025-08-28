@@ -14,7 +14,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { salesAPI, dashboardAPI } from '../services/api';
+import { salesAPI, dashboardAPI, usersAPI } from '../services/api';
 import { useToast } from '../hooks/use-toast';
 
 const SalesReports = () => {
@@ -26,6 +26,7 @@ const SalesReports = () => {
   const [sales, setSales] = useState([]);
   const [selectedSale, setSelectedSale] = useState(null);
   const [cashierPerf, setCashierPerf] = useState([]);
+  const [usersMap, setUsersMap] = useState({}); // id -> display name
   const { toast } = useToast();
 
   const toISOStart = (dateStr) => {
@@ -82,9 +83,25 @@ const SalesReports = () => {
     }
   };
 
+  const fetchUsers = async () => {
+    try {
+      const data = await usersAPI.getUsers();
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+      const map = {};
+      list.forEach(u => {
+        const name = (u.full_name && u.full_name.trim()) ? u.full_name : u.username || u.id;
+        if (u.id) map[u.id] = name;
+      });
+      setUsersMap(map);
+    } catch {
+      // ignore; fall back to showing IDs
+    }
+  };
+
   useEffect(() => {
     fetchSales();
     fetchCashierPerformance();
+    fetchUsers();
   }, []);
 
   const filteredSales = sales; // already filtered by API
@@ -155,18 +172,21 @@ const SalesReports = () => {
   // Export helpers
   const handleExportCSV = () => {
     const header = [
-      'SatisID', 'Tarih', 'KasiyerID', 'UrunAdedi', 'AraToplam', 'KDV', 'Toplam'
+      'SatisID', 'Tarih', 'Kasiyer', 'UrunAdedi', 'AraToplam', 'KDV', 'Toplam'
     ];
-    const rows = filteredSales.map(sale => [
-      sale.id,
-      new Date(sale.created_at).toISOString(),
-      sale.cashier_id || '',
-      (sale.items || []).reduce((sum, i) => sum + (i.quantity || 0), 0),
-      (sale.subtotal ?? 0).toString().replace('.', ','),
-      (sale.tax_amount ?? 0).toString().replace('.', ','),
-      (sale.total ?? 0).toString().replace('.', ',')
-    ]);
-    const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\r\n');
+    const rows = filteredSales.map(sale => {
+      const cashierName = usersMap[sale.cashier_id] || sale.cashier_id || '';
+      return [
+        sale.id,
+        new Date(sale.created_at).toISOString(),
+        cashierName,
+        (sale.items || []).reduce((sum, i) => sum + (i.quantity || 0), 0),
+        (sale.subtotal ?? 0).toString().replace('.', ','),
+        (sale.tax_amount ?? 0).toString().replace('.', ','),
+        (sale.total ?? 0).toString().replace('.', ',')
+      ];
+    });
+    const csv = [header, ...rows].map(r => r.map(v => `\"${String(v).replace(/\"/g, '\"\"')}\"`).join(';')).join('\r\n');
     const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -179,37 +199,60 @@ const SalesReports = () => {
   };
 
   const SaleDetailModal = ({ sale, onClose }) => {
+    const cashierName = usersMap[sale.cashier_id] || sale.cashier_id || '';
     const handleDownloadPDF = () => {
-      const title = `Satış Fişi - ${sale.id}`;
+      const COMPANY_NAME = process.env.REACT_APP_COMPANY_NAME || 'Malatya Avize Dünyası';
+      const COMPANY_ADDRESS = process.env.REACT_APP_COMPANY_ADDRESS || 'Malatya, Türkiye';
+      const title = `Satış Fişi - ${COMPANY_NAME} - ${sale.id}`;
       const rows = (sale.items || []).map(i => `
         <tr>
           <td>${i.product_name}</td>
-          <td>${i.barcode}</td>
           <td style="text-align:right;">${i.quantity}</td>
           <td style="text-align:right;">${formatCurrency(i.unit_price)}</td>
           <td style="text-align:right;">${formatCurrency(i.total_price)}</td>
         </tr>`).join('');
-      const html = `<!doctype html><html><head><meta charset="utf-8"/>
+      const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"/>
         <title>${title}</title>
         <style>
-          body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:#111}
+          :root{--ink:#111;--muted:#555;--line:#ccc;--bg:#f5f5f5;--brand:#111}
+          *{box-sizing:border-box}
+          body{font-family:Arial,Helvetica,sans-serif;padding:24px;color:var(--ink)}
           h1{font-size:18px;margin:0 0 8px}
-          .meta{font-size:12px;color:#555;margin-bottom:12px}
+          .meta{font-size:12px;color:var(--muted);margin-bottom:12px}
+          .header{display:flex;align-items:center;gap:16px;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:12px}
+          .logo{width:54px;height:54px;display:flex;align-items:center;justify-content:center;border:1px solid var(--ink);border-radius:6px}
+          .company h1{font-size:20px;margin:0}
+          .company .addr{font-size:12px;color:var(--muted)}
           table{width:100%;border-collapse:collapse;margin-top:12px}
-          th,td{border:1px solid #ccc;padding:6px;font-size:12px}
-          th{background:#f5f5f5;text-align:left}
+          th,td{border:1px solid var(--line);padding:6px;font-size:12px}
+          th{background:var(--bg);text-align:left}
           .totals{margin-top:12px;float:right}
           .totals table{width:auto}
+          .stamp{margin-top:28px;border:2px dashed var(--muted);border-radius:8px;padding:12px;width:220px;text-align:center;color:var(--muted)}
+          .footer-note{margin-top:12px;font-size:11px;color:var(--muted)}
+          @media print{body{padding:0 16px}}
         </style></head><body>
-        <h1>${title}</h1>
-        <div class="meta">
-          <div>Tarih: ${formatDate(sale.created_at)}</div>
-          <div>Kasiyer ID: ${sale.cashier_id || ''}</div>
+        <div class="header">
+          <div class="logo" aria-hidden="true">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2c-3 0-5 2.5-5 5.5 0 1.7.8 3.2 2 4.2V14a3 3 0 0 0 2 2.83V20h2v-3.17A3 3 0 0 0 15 14v-2.3c1.2-1 2-2.5 2-4.2C17 4.5 15 2 12 2Z" stroke="currentColor" stroke-width="1.5" fill="none"/>
+              <circle cx="12" cy="8" r="1.8" fill="currentColor"/>
+            </svg>
+          </div>
+          <div class="company">
+            <h1>${COMPANY_NAME}</h1>
+            <div class="addr">${COMPANY_ADDRESS}</div>
+          </div>
         </div>
-        <table>
+        <div class="meta">
+          <div><strong>Belge:</strong> Satış Fişi</div>
+          <div><strong>Tarih:</strong> ${formatDate(sale.created_at)}</div>
+          <div><strong>Kasiyer:</strong> ${cashierName}</div>
+        </div>
+    <table>
           <thead>
             <tr>
-              <th>Ürün</th><th>Barkod</th><th>Adet</th><th>Birim</th><th>Toplam</th>
+      <th>Ürün</th><th>Adet</th><th>Birim</th><th>Toplam</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -221,6 +264,9 @@ const SalesReports = () => {
             <tr><th>TOPLAM</th><td><strong>${formatCurrency(sale.total)}</strong></td></tr>
           </table>
         </div>
+        <div style="clear:both"></div>
+        <div class="stamp">Firma Kaşesi / İmza</div>
+        <div class="footer-note">Bu fiş ${COMPANY_NAME} tarafından düzenlenmiştir. İade/değişim işlemlerinde fiş ve kaşe ibrazı gereklidir.</div>
         <script>window.onload=()=>{window.print(); setTimeout(()=>window.close(),500)}</script>
         </body></html>`;
       const w = window.open('', '_blank');
@@ -238,7 +284,7 @@ const SalesReports = () => {
             <CardTitle>Satış Detayı - {sale.id}</CardTitle>
             <div className="text-sm text-gray-600">
               <p>Tarih: {formatDate(sale.created_at)}</p>
-              <p>Kasiyer: {sale.cashier_id || '—'}</p>
+              <p>Kasiyer: {usersMap[sale.cashier_id] || sale.cashier_id || '—'}</p>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -249,7 +295,7 @@ const SalesReports = () => {
                   <div key={`${item.product_id || index}-${index}`} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
                     <div>
                       <p className="font-medium">{item.product_name}</p>
-                      <p className="text-sm text-gray-500">{item.barcode}</p>
+                      {/* Barkod gizlendi: İrsaliye/fişte barkod gösterilmeyecek */}
                     </div>
                     <div className="text-right">
                       <p className="font-medium">{item.quantity} x {formatCurrency(item.unit_price)}</p>
@@ -477,7 +523,7 @@ const SalesReports = () => {
                     <tr key={sale.id} className="border-b hover:bg-gray-50">
                       <td className="py-3 font-mono">{sale.id}</td>
                       <td className="py-3">{formatDate(sale.created_at)}</td>
-                      <td className="py-3">{sale.cashier_id || '—'}</td>
+                      <td className="py-3">{usersMap[sale.cashier_id] || sale.cashier_id || '—'}</td>
                       <td className="py-3">
                         {(sale.items || []).reduce((sum, item) => sum + (item.quantity || 0), 0)} adet
                       </td>

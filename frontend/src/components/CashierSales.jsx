@@ -153,10 +153,26 @@ const CashierSales = ({ user }) => {
     setQuantityInput(1);
   };
 
-  // Calculate totals
-  const subtotal = cart.reduce((sum, item) => sum + item.total_price, 0);
-  const taxAmount = cart.reduce((sum, item) => sum + (item.total_price * item.tax_rate / 100), 0);
-  const total = subtotal + taxAmount;
+  // Calculate totals (VAT-inclusive pricing):
+  // - item.unit_price and item.total_price are gross (KDV dahil)
+  // - derive net and tax from gross so we don't add KDV on top again
+  const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+  const totals = cart.reduce(
+    (acc, item) => {
+      const gross = item.total_price || 0; // quantity * unit_price (KDV dahil)
+      const rate = ((item.tax_rate ?? 0) / 100);
+      const net = rate > 0 ? gross / (1 + rate) : gross;
+      const tax = gross - net;
+      acc.subtotal += net;
+      acc.tax += tax;
+      acc.total += gross;
+      return acc;
+    },
+    { subtotal: 0, tax: 0, total: 0 }
+  );
+  const subtotal = round2(totals.subtotal);
+  const taxAmount = round2(totals.tax);
+  const total = round2(totals.total);
 
   // Process sale
   const processSale = async () => {
@@ -391,7 +407,7 @@ const CashierSales = ({ user }) => {
                 </>
               ) : (
                 <>
-                  <Receipt className="h-5 w-5 mr-2" />
+                  <span className="mr-2 text-lg" aria-hidden>₺</span>
                   Satışı Tamamla
                 </>
               )}
