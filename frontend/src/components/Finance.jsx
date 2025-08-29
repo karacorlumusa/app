@@ -267,7 +267,7 @@ const Finance = ({ user }) => {
         try {
             await ensureHtml2Pdf();
 
-            // Build a real fragment (no <html>/<body>) so html2pdf can capture reliably
+            // Build a visible (but hidden) node so html2canvas can measure size correctly
             const escape = (s = '') => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
             const fmtDate = (d) => d ? new Date(d).toLocaleString('tr-TR') : '';
             const nowStr = new Date().toLocaleString('tr-TR');
@@ -306,11 +306,12 @@ const Finance = ({ user }) => {
                             tfoot td { font-weight:700; }
                         `;
 
-            const wrapper = document.createElement('div');
-            wrapper.style.position = 'fixed';
-            wrapper.style.left = '-99999px';
-            wrapper.style.top = '0';
-            wrapper.style.width = '794px';
+            const container = document.createElement('div');
+            container.style.position = 'absolute';
+            container.style.left = '0';
+            container.style.top = '0';
+            container.style.width = '794px'; // ~A4 width at 96dpi
+            container.style.visibility = 'hidden';
             const styleEl = document.createElement('style');
             styleEl.textContent = css;
             const contentEl = document.createElement('div');
@@ -348,19 +349,19 @@ const Finance = ({ user }) => {
                                 </tbody>
                             </table>
                         `;
-            wrapper.appendChild(styleEl);
-            wrapper.appendChild(contentEl);
-            document.body.appendChild(wrapper);
+            container.appendChild(styleEl);
+            container.appendChild(contentEl);
+            document.body.appendChild(container);
 
             const opt = {
                 margin: [15, 15, 15, 15],
                 filename: 'gelir-gider.pdf',
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
-            await window.html2pdf().set(opt).from(wrapper).save();
-            document.body.removeChild(wrapper);
+            await window.html2pdf().set(opt).from(contentEl).save();
+            document.body.removeChild(container);
         } catch (err) {
             console.error(err);
             toast({ title: 'Hata', description: 'PDF indirilemedi', variant: 'destructive' });
