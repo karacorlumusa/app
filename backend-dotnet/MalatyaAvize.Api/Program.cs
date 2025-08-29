@@ -10,8 +10,38 @@ using MalatyaAvize.Api.Services;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Security.Cryptography;
+using Serilog;
+using Serilog.Events;
+
+// Bootstrap Serilog early
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File(
+        path: "logs/app-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 14,
+        restrictedToMinimumLevel: LogEventLevel.Information,
+        shared: true
+    )
+    .CreateLogger();
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Host.UseSerilog((ctx, cfg) =>
+{
+    cfg.MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+       .ReadFrom.Configuration(ctx.Configuration)
+       .Enrich.FromLogContext()
+       .WriteTo.Console()
+       .WriteTo.File(
+            path: "logs/app-.log",
+            rollingInterval: RollingInterval.Day,
+            retainedFileCountLimit: 14,
+            restrictedToMinimumLevel: LogEventLevel.Information,
+            shared: true
+        );
+});
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -78,6 +108,7 @@ builder.Services.AddScoped<FinanceService>();
 
 var app = builder.Build();
 
+app.UseSerilogRequestLogging();
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -514,4 +545,16 @@ app.MapGet("/api/dashboard/cashier-performance", async (MongoContext db) =>
     return Results.Ok(byCashier);
 }).RequireAuthorization();
 
-app.Run();
+try
+{
+    Log.Information("Starting Malatya Avize API");
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Host terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

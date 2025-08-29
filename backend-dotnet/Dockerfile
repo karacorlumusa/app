@@ -16,4 +16,5 @@ WORKDIR /app
 COPY --from=build /app/publish .
 EXPOSE 8001
 ENV ASPNETCORE_URLS=http://+:8001
+RUN mkdir -p /app/logs || true
 ENTRYPOINT ["dotnet", "MalatyaAvize.Api.dll"]

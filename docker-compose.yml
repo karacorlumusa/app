@@ -22,8 +22,11 @@ services:
       - SECRET_KEY=change-me-in-prod
       - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
       - ASPNETCORE_ENVIRONMENT=Development
+      - SERILOG__MINIMUMLEVEL__DEFAULT=Information
     ports:
       - "127.0.0.1:8001:8001"
+    volumes:
+      - ./backend-dotnet/logs:/app/backend-dotnet/MalatyaAvize.Api/logs
 
   frontend:
     build:
