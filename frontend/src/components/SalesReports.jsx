@@ -172,12 +172,16 @@ const SalesReports = () => {
   // Export helpers
   const handleExportCSV = () => {
     const header = [
-      'SatisID', 'Tarih', 'Kasiyer', 'UrunAdedi', 'AraToplam', 'KDV', 'Toplam'
+      'Urunler', 'Tarih', 'Kasiyer', 'UrunAdedi', 'AraToplam', 'KDV', 'Toplam'
     ];
     const rows = filteredSales.map(sale => {
       const cashierName = usersMap[sale.cashier_id] || sale.cashier_id || '';
+      const productNames = (sale.items || [])
+        .map(i => i?.product_name || i?.barcode || i?.product_id)
+        .filter(Boolean)
+        .join(', ');
       return [
-        sale.id,
+        productNames,
         new Date(sale.created_at).toISOString(),
         cashierName,
         (sale.items || []).reduce((sum, i) => sum + (i.quantity || 0), 0),
@@ -510,7 +514,7 @@ const SalesReports = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-2">Satış ID</th>
+                    <th className="text-left py-2">Ürün(ler)</th>
                     <th className="text-left py-2">Tarih</th>
                     <th className="text-left py-2">Kasiyer</th>
                     <th className="text-left py-2">Ürün Sayısı</th>
@@ -521,7 +525,14 @@ const SalesReports = () => {
                 <tbody>
                   {filteredSales.map((sale) => (
                     <tr key={sale.id} className="border-b hover:bg-gray-50">
-                      <td className="py-3 font-mono">{sale.id}</td>
+                      <td className="py-3">
+                        {(() => {
+                          const names = (sale.items || []).map(i => i?.product_name || i?.barcode || i?.product_id).filter(Boolean);
+                          if (names.length === 0) return '—';
+                          if (names.length === 1) return names[0];
+                          return `${names[0]} +${names.length - 1}`;
+                        })()}
+                      </td>
                       <td className="py-3">{formatDate(sale.created_at)}</td>
                       <td className="py-3">{usersMap[sale.cashier_id] || sale.cashier_id || '—'}</td>
                       <td className="py-3">
