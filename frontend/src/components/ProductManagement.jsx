@@ -157,6 +157,82 @@ const ProductManagement = () => {
     }, 100);
   };
 
+  const printAllBarcodes = () => {
+    try {
+      const items = (products || []).filter(p => p && p.barcode);
+      if (items.length === 0) {
+        toast({ title: 'Barkod yok', description: 'Barkodu olan ürün bulunamadı', variant: 'destructive' });
+        return;
+      }
+      const escapeHtml = (s) => String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+      // Pre-render all barcodes as SVG strings for reliability
+      const labels = items.map((p) => {
+        const tempSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        try {
+          JsBarcode(tempSvg, String(p.barcode), {
+            format: 'CODE128',
+            lineColor: '#000',
+            width: 1.4,
+            height: 48,
+            displayValue: true,
+            font: 'monospace',
+            fontSize: 12,
+            textMargin: 2,
+            margin: 4
+          });
+        } catch (e) {
+          // Skip items that fail to render
+          return null;
+        }
+        const name = escapeHtml(p.name || '');
+        const price = p.sell_price ? escapeHtml(new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(p.sell_price)) : '';
+        const priceHtml = price ? `<div class=\"price\">${price}</div>` : '';
+        return `<div class=\"label\">` +
+          `<div class=\"name\">${name}</div>` +
+          `${tempSvg.outerHTML}` +
+          `${priceHtml}` +
+          `</div>`;
+      }).filter(Boolean);
+
+      if (labels.length === 0) {
+        toast({ title: 'Barkod oluşturulamadı', description: 'Yazdırılacak geçerli barkod bulunamadı', variant: 'destructive' });
+        return;
+      }
+
+      const win = window.open('', 'PRINT_ALL_BARCODES', 'height=900,width=1280');
+      if (!win) return;
+      const style = `
+        <style>
+          @page { size: A4 portrait; margin: 8mm; }
+          body { font-family: Arial, sans-serif; }
+          .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6mm; }
+          .label { border: 1px dashed transparent; padding: 4mm; text-align: center; break-inside: avoid; }
+          .name { font-size: 12px; font-weight: 600; margin-bottom: 2mm; }
+          .price { font-size: 11px; margin-top: 2mm; }
+          svg { width: 100%; height: auto; max-width: 70mm; }
+          @media print {
+            body { margin: 0; }
+          }
+        </style>
+      `;
+      win.document.write(`<!DOCTYPE html><html><head><title>Tüm Barkodlar</title>${style}</head><body>`);
+      win.document.write(`<div class=\"grid\">${labels.join('')}</div>`);
+      win.document.write(`</body></html>`);
+      win.document.close();
+      win.focus();
+      setTimeout(() => { try { win.print(); } catch { } try { win.close(); } catch { } }, 200);
+    } catch (err) {
+      console.error('printAllBarcodes error', err);
+      toast({ title: 'Hata', description: 'Barkodlar yazdırılamadı', variant: 'destructive' });
+    }
+  };
+
   const ProductForm = ({ product, onClose }) => {
     const [formData, setFormData] = useState(product || {
       barcode: '',
@@ -445,10 +521,16 @@ const ProductManagement = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Ürün Yönetimi</h1>
-        <Button onClick={handleAddProduct}>
-          <Plus className="h-4 w-4 mr-2" />
-          Yeni Ürün
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={printAllBarcodes} variant="outline" title="Listedeki tüm ürünlerin barkodlarını tek seferde yazdır">
+            <Printer className="h-4 w-4 mr-2" />
+            Tüm Barkodları Yazdır
+          </Button>
+          <Button onClick={handleAddProduct}>
+            <Plus className="h-4 w-4 mr-2" />
+            Yeni Ürün
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
