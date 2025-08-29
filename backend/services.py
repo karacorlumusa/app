@@ -227,17 +227,19 @@ class SalesService:
             if product.stock < item_data.quantity:
                 raise ValueError(f"Insufficient stock for {product.name}")
             
-            # Calculate item totals
-            item_total = item_data.quantity * item_data.unit_price
-            item_tax = item_total * item_data.tax_rate / 100
+            # Calculate item totals (VAT-inclusive unit_price)
+            gross_total = item_data.quantity * item_data.unit_price
+            rate = (item_data.tax_rate or 0) / 100
+            net_total = gross_total / (1 + rate) if rate > 0 else gross_total
+            item_tax = gross_total - net_total
             
             sale_item = SaleItem(
                 **item_data.dict(),
-                total_price=item_total
+                total_price=gross_total
             )
             
             items.append(sale_item)
-            subtotal += item_total
+            subtotal += net_total
             tax_amount += item_tax
         
         total = subtotal + tax_amount
@@ -248,7 +250,8 @@ class SalesService:
             items=items,
             subtotal=subtotal,
             tax_amount=tax_amount,
-            total=total
+            total=total,
+            payment_method=getattr(sale_data, "payment_method", None)
         )
         
         await insert_one("sales", sale.dict())
@@ -425,3 +428,83 @@ class DashboardService:
                 average_sale=result["average_sale"]
             ) for result in results
         ]
+
+class FinanceService:
+    @staticmethod
+    async def get_transactions(
+        skip: int = 0,
+        limit: int = 100,
+        start_date: datetime = None,
+        end_date: datetime = None,
+        type: FinanceType = None,
+        search: str = None
+    ) -> List[FinanceTransaction]:
+        filter_dict: Dict[str, Any] = {}
+        if start_date or end_date:
+            date_filter: Dict[str, Any] = {}
+            if start_date:
+                date_filter["$gte"] = start_date
+            if end_date:
+                date_filter["$lte"] = end_date
+            filter_dict["date"] = date_filter
+        if type:
+            filter_dict["type"] = type.value if isinstance(type, FinanceType) else type
+        if search:
+            filter_dict["$or"] = [
+                {"category": {"$regex": search, "$options": "i"}},
+                {"description": {"$regex": search, "$options": "i"}},
+                {"person": {"$regex": search, "$options": "i"}},
+                {"created_by_name": {"$regex": search, "$options": "i"}},
+            ]
+        docs = await find_many("finance", filter_dict, skip=skip, limit=limit, sort={"date": -1})
+        return [FinanceTransaction(**d) for d in docs]
+
+    @staticmethod
+    async def create_transaction(data: FinanceTransactionCreate, current_user: User) -> FinanceTransaction:
+        doc = FinanceTransaction(**data.dict(), created_by=current_user.id, created_by_name=current_user.full_name)
+        await insert_one("finance", doc.dict())
+        return doc
+
+    @staticmethod
+    async def update_transaction(tx_id: str, update: FinanceTransactionUpdate) -> Optional[FinanceTransaction]:
+        update_dict = {k: v for k, v in update.dict().items() if v is not None}
+        success = await update_one("finance", {"id": tx_id}, update_dict)
+        if success:
+            data = await find_one("finance", {"id": tx_id})
+            return FinanceTransaction(**data) if data else None
+        return None
+
+    @staticmethod
+    async def delete_transaction(tx_id: str) -> bool:
+        return await delete_one("finance", {"id": tx_id})
+
+    @staticmethod
+    async def get_summary(start_date: datetime = None, end_date: datetime = None, type: FinanceType = None) -> Dict[str, float]:
+        filter_dict: Dict[str, Any] = {}
+        if start_date or end_date:
+            date_filter: Dict[str, Any] = {}
+            if start_date:
+                date_filter["$gte"] = start_date
+            if end_date:
+                date_filter["$lte"] = end_date
+            filter_dict["date"] = date_filter
+        if type:
+            filter_dict["type"] = type.value if isinstance(type, FinanceType) else type
+        pipeline = [
+            {"$match": filter_dict},
+            {
+                "$group": {
+                    "_id": "$type",
+                    "total": {"$sum": "$amount"}
+                }
+            }
+        ]
+        results = await aggregate("finance", pipeline)
+        income = 0.0
+        expense = 0.0
+        for r in results:
+            if r["_id"] == "income":
+                income = r["total"]
+            elif r["_id"] == "expense":
+                expense = r["total"]
+        return {"income": income, "expense": expense, "net": income - expense}

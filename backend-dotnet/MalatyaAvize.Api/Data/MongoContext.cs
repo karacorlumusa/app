@@ -22,6 +22,7 @@ public class MongoContext
     public IMongoCollection<Product> Products => Database.GetCollection<Product>("products");
     public IMongoCollection<StockMovement> StockMovements => Database.GetCollection<StockMovement>("stock_movements");
     public IMongoCollection<Sale> Sales => Database.GetCollection<Sale>("sales");
+    public IMongoCollection<FinanceTransaction> Finance => Database.GetCollection<FinanceTransaction>("finance");
 
     private void EnsureIndexes()
     {

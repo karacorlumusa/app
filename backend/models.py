@@ -13,6 +13,14 @@ class StockMovementType(str, Enum):
     stock_in = "in"
     stock_out = "out"
 
+class PaymentMethod(str, Enum):
+    cash = "cash"
+    card = "card"
+
+class FinanceType(str, Enum):
+    income = "income"
+    expense = "expense"
+
 # Base Models
 class BaseDBModel(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -120,6 +128,7 @@ class SaleItem(SaleItemBase):
 
 class SaleBase(BaseModel):
     items: List[SaleItemBase]
+    payment_method: Optional[PaymentMethod] = None
 
 class SaleCreate(SaleBase):
     pass
@@ -130,6 +139,7 @@ class Sale(BaseDBModel):
     subtotal: float
     tax_amount: float
     total: float
+    payment_method: Optional[PaymentMethod] = None
 
 # Dashboard Models
 class DashboardStats(BaseModel):
@@ -177,3 +187,27 @@ class PaginatedResponse(BaseModel):
     page: int
     per_page: int
     pages: int
+
+# Finance (Income/Expense) Models
+class FinanceTransactionBase(BaseModel):
+    type: FinanceType
+    amount: float = Field(..., ge=0)
+    date: datetime = Field(default_factory=datetime.utcnow)
+    category: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    person: Optional[str] = Field(None, max_length=100)
+
+class FinanceTransactionCreate(FinanceTransactionBase):
+    pass
+
+class FinanceTransactionUpdate(BaseModel):
+    type: Optional[FinanceType] = None
+    amount: Optional[float] = Field(None, ge=0)
+    date: Optional[datetime] = None
+    category: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    person: Optional[str] = Field(None, max_length=100)
+
+class FinanceTransaction(FinanceTransactionBase, BaseDBModel):
+    created_by: Optional[str] = None
+    created_by_name: Optional[str] = None

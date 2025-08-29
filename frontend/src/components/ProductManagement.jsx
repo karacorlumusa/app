@@ -173,6 +173,33 @@ const ProductManagement = () => {
     const [saving, setSaving] = useState(false);
     const existingBarcodes = useMemo(() => new Set(products.map(p => String(p.barcode))), [products]);
     const barcodeRef = useRef(null);
+    const lastStrongSetRef = useRef(0); // paste/generate sonrası kısa süreli değişiklik kilidi
+
+    const handleBarcodeChange = (e) => {
+      const v = e.target.value;
+      // Son güçlü setten (paste/generate) hemen sonra gelen boşaltma olaylarını yok say
+      if (v === '' && Date.now() - lastStrongSetRef.current < 600) return;
+      setFormData(prev => ({ ...prev, barcode: v }));
+    };
+    const handleBarcodePaste = (e) => {
+      try {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+        lastStrongSetRef.current = Date.now();
+        const v = String(text).trim();
+        setFormData(prev => ({ ...prev, barcode: v }));
+        // Move caret to end after render
+        setTimeout(() => {
+          const el = barcodeRef.current;
+          if (el && typeof el.setSelectionRange === 'function') {
+            const len = v.length;
+            try { el.setSelectionRange(len, len); } catch { }
+          }
+        }, 0);
+      } catch {
+        // Fallback: let default paste proceed
+      }
+    };
 
     const handleGenerateBarcode = async () => {
       try {
@@ -182,18 +209,18 @@ const ProductManagement = () => {
         // Update state (controlled input)
         const codeStr = String(code);
         setFormData(prev => ({ ...prev, barcode: codeStr }));
-        // Best-effort: also copy to clipboard and ensure the input visually reflects the value immediately
-        try { await navigator.clipboard.writeText(codeStr); } catch { }
-        setTimeout(() => {
-          if (barcodeRef.current) {
-            barcodeRef.current.value = codeStr;
-            barcodeRef.current.focus();
-            // move caret to end
-            const el = barcodeRef.current;
-            const len = codeStr.length;
-            try { el.setSelectionRange(len, len); } catch { }
+        // Also reflect immediately in the input for visual feedback
+        requestAnimationFrame(() => {
+          const el = barcodeRef.current;
+          if (el) {
+            el.value = codeStr;
+            el.focus();
+            try { el.setSelectionRange(codeStr.length, codeStr.length); } catch { }
           }
-        }, 0);
+        });
+        lastStrongSetRef.current = Date.now();
+        // Best-effort: also copy to clipboard
+        try { await navigator.clipboard.writeText(codeStr); } catch { }
         toast({ title: 'Barkod oluşturuldu', description: codeStr });
       } catch (err) {
         // Fallback to client-side generator if backend not available
@@ -208,16 +235,16 @@ const ProductManagement = () => {
         }
         const codeStr = String(candidate);
         setFormData(prev => ({ ...prev, barcode: codeStr }));
-        try { await navigator.clipboard.writeText(codeStr); } catch { }
-        setTimeout(() => {
-          if (barcodeRef.current) {
-            barcodeRef.current.value = codeStr;
-            barcodeRef.current.focus();
-            const el = barcodeRef.current;
-            const len = codeStr.length;
-            try { el.setSelectionRange(len, len); } catch { }
+        requestAnimationFrame(() => {
+          const el = barcodeRef.current;
+          if (el) {
+            el.value = codeStr;
+            el.focus();
+            try { el.setSelectionRange(codeStr.length, codeStr.length); } catch { }
           }
-        }, 0);
+        });
+        lastStrongSetRef.current = Date.now();
+        try { await navigator.clipboard.writeText(codeStr); } catch { }
         toast({ title: 'Barkod oluşturuldu (yerel)', description: codeStr });
       }
     };
@@ -275,7 +302,8 @@ const ProductManagement = () => {
                       autoComplete="off"
                       name="barcode"
                       value={formData.barcode}
-                      onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                      onChange={handleBarcodeChange}
+                      onPaste={handleBarcodePaste}
                       placeholder="Barkod numarası"
                       required
                       className="flex-1"
@@ -308,8 +336,8 @@ const ProductManagement = () => {
                     required
                   />
                   <datalist id="categories">
-                    {categories.map(category => (
-                      <option key={category} value={category} />
+                    {categories.map((category, idx) => (
+                      <option key={`${category || 'empty'}-${idx}`} value={category} />
                     ))}
                   </datalist>
                 </div>
@@ -496,8 +524,8 @@ const ProductManagement = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((product) => (
-                    <tr key={product.id} className="border-b hover:bg-gray-50">
+                  {products.map((product, idx) => (
+                    <tr key={`${product.id}-${idx}`} className="border-b hover:bg-gray-50">
                       <td className="py-3">
                         <div>
                           <p className="font-medium">{product.name}</p>

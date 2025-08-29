@@ -3,20 +3,36 @@
   "WorkspaceRootPath": "C:\\Users\\karac\\source\\repos\\app\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|c:\\users\\karac\\source\\repos\\app\\backend-dotnet\\malatyaavize.api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|solutionrelative:backend-dotnet\\malatyaavize.api\\program.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|c:\\users\\karac\\source\\repos\\app\\backend-dotnet\\malatyaavize.api\\services\\userservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|solutionrelative:backend-dotnet\\malatyaavize.api\\services\\userservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|c:\\users\\karac\\source\\repos\\app\\backend-dotnet\\malatyaavize.api\\services\\stockservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|solutionrelative:backend-dotnet\\malatyaavize.api\\services\\stockservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|c:\\users\\karac\\source\\repos\\app\\backend-dotnet\\malatyaavize.api\\services\\salesservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|solutionrelative:backend-dotnet\\malatyaavize.api\\services\\salesservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|c:\\users\\karac\\source\\repos\\app\\backend-dotnet\\malatyaavize.api\\services\\productservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|solutionrelative:backend-dotnet\\malatyaavize.api\\services\\productservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
       "AbsoluteMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|c:\\users\\karac\\source\\repos\\app\\backend-dotnet\\malatyaavize.api\\services\\authservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|solutionrelative:backend-dotnet\\malatyaavize.api\\services\\authservice.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|c:\\users\\karac\\source\\repos\\app\\backend-dotnet\\malatyaavize.api\\models\\authdtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
-      "RelativeMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|solutionrelative:backend-dotnet\\malatyaavize.api\\models\\authdtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|c:\\users\\karac\\source\\repos\\app\\backend-dotnet\\malatyaavize.api\\data\\mongocontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
       "RelativeMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|solutionrelative:backend-dotnet\\malatyaavize.api\\data\\mongocontext.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|c:\\users\\karac\\source\\repos\\app\\backend-dotnet\\malatyaavize.api\\models\\authdtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{8B387473-A2BF-BFEA-E9EE-F188F93F0B71}|backend-dotnet\\MalatyaAvize.Api\\MalatyaAvize.Api.csproj|solutionrelative:backend-dotnet\\malatyaavize.api\\models\\authdtos.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     }
   ],
   "DocumentGroupContainers": [
@@ -35,19 +51,71 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
+              "Title": "Program.cs",
+              "DocumentMoniker": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Program.cs",
+              "RelativeDocumentMoniker": "backend-dotnet\\MalatyaAvize.Api\\Program.cs",
+              "ToolTip": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Program.cs",
+              "RelativeToolTip": "backend-dotnet\\MalatyaAvize.Api\\Program.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-28T20:15:49.879Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "UserService.cs",
+              "DocumentMoniker": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Services\\UserService.cs",
+              "RelativeDocumentMoniker": "backend-dotnet\\MalatyaAvize.Api\\Services\\UserService.cs",
+              "ToolTip": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Services\\UserService.cs",
+              "RelativeToolTip": "backend-dotnet\\MalatyaAvize.Api\\Services\\UserService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-28T20:15:44.077Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "StockService.cs",
+              "DocumentMoniker": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Services\\StockService.cs",
+              "RelativeDocumentMoniker": "backend-dotnet\\MalatyaAvize.Api\\Services\\StockService.cs",
+              "ToolTip": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Services\\StockService.cs",
+              "RelativeToolTip": "backend-dotnet\\MalatyaAvize.Api\\Services\\StockService.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-28T20:15:39.718Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "ProductService.cs",
+              "DocumentMoniker": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Services\\ProductService.cs",
+              "RelativeDocumentMoniker": "backend-dotnet\\MalatyaAvize.Api\\Services\\ProductService.cs",
+              "ToolTip": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Services\\ProductService.cs",
+              "RelativeToolTip": "backend-dotnet\\MalatyaAvize.Api\\Services\\ProductService.cs",
+              "ViewState": "AgIAAFkAAAAAAAAAAAAAwAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-08-28T20:14:28.646Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
               "Title": "SalesService.cs",
               "DocumentMoniker": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Services\\SalesService.cs",
               "RelativeDocumentMoniker": "backend-dotnet\\MalatyaAvize.Api\\Services\\SalesService.cs",
               "ToolTip": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Services\\SalesService.cs",
               "RelativeToolTip": "backend-dotnet\\MalatyaAvize.Api\\Services\\SalesService.cs",
-              "ViewState": "AgIAANAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAH4AAAAAAAAAAAAmwAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-08-28T13:46:05.209Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 5,
               "Title": "AuthService.cs",
               "DocumentMoniker": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Services\\AuthService.cs",
               "RelativeDocumentMoniker": "backend-dotnet\\MalatyaAvize.Api\\Services\\AuthService.cs",
@@ -60,7 +128,7 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 7,
               "Title": "AuthDtos.cs",
               "DocumentMoniker": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Models\\AuthDtos.cs",
               "RelativeDocumentMoniker": "backend-dotnet\\MalatyaAvize.Api\\Models\\AuthDtos.cs",
@@ -68,18 +136,17 @@
               "RelativeToolTip": "backend-dotnet\\MalatyaAvize.Api\\Models\\AuthDtos.cs",
               "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-08-28T13:45:41.875Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-08-28T13:45:41.875Z"
             },
             {
               "$type": "Document",
-              "DocumentIndex": 3,
+              "DocumentIndex": 6,
               "Title": "MongoContext.cs",
               "DocumentMoniker": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Data\\MongoContext.cs",
               "RelativeDocumentMoniker": "backend-dotnet\\MalatyaAvize.Api\\Data\\MongoContext.cs",
               "ToolTip": "C:\\Users\\karac\\source\\repos\\app\\backend-dotnet\\MalatyaAvize.Api\\Data\\MongoContext.cs",
               "RelativeToolTip": "backend-dotnet\\MalatyaAvize.Api\\Data\\MongoContext.cs",
-              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABgAAAAAAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-08-28T13:45:35.398Z",
               "EditorCaption": ""

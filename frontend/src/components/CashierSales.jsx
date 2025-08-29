@@ -9,7 +9,10 @@ import {
   Calculator,
   Receipt,
   User,
-  Package
+  Package,
+  Pencil,
+  CreditCard,
+  Wallet
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -26,6 +29,8 @@ const CashierSales = ({ user }) => {
   const [currentSale, setCurrentSale] = useState(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState(null); // 'cash' | 'card'
   // Kasiyer yardım paneli: son okutulan ürün bilgisi (alış fiyatı, satış fiyatı)
   const [lastScannedInfo, setLastScannedInfo] = useState(null); // { name, buy_price, sell_price }
   const [revealCost, setRevealCost] = useState(false);
@@ -174,6 +179,30 @@ const CashierSales = ({ user }) => {
     ));
   };
 
+  // Override item price (VAT-inclusive)
+  const overridePrice = (productId) => {
+    const item = cart.find(i => i.product_id === productId);
+    if (!item) return;
+    const current = Number(item.unit_price) || 0;
+    const input = window.prompt('Yeni Birim Fiyat (KDV Dahil) ₺', current.toString().replace('.', ','));
+    if (input == null) return; // cancelled
+    const normalized = input.replace(',', '.');
+    const val = parseFloat(normalized);
+    if (Number.isNaN(val) || val <= 0) {
+      toast({ title: 'Geçersiz fiyat', description: 'Lütfen geçerli bir fiyat girin', variant: 'destructive' });
+      return;
+    }
+    setCart(cart.map(i => i.product_id === productId ? {
+      ...i,
+      unit_price: val,
+      total_price: val * i.quantity
+    } : i));
+    // Yardım paneli güncellemesi (eğer bu ürüne bakıyorsak)
+    if (lastScannedInfo && lastScannedInfo.name === item.product_name) {
+      setLastScannedInfo({ ...lastScannedInfo, sell_price: val });
+    }
+  };
+
   // Remove item from cart
   const removeFromCart = (productId) => {
     setCart(cart.filter(item => item.product_id !== productId));
@@ -208,13 +237,18 @@ const CashierSales = ({ user }) => {
   const total = round2(totals.total);
 
   // Process sale
-  const processSale = async () => {
+  const processSale = async (method) => {
     if (cart.length === 0) {
       toast({
         title: "Sepet boş",
         description: "Satış yapmak için sepete ürün ekleyin",
         variant: "destructive"
       });
+      return;
+    }
+
+    if (!method) {
+      setShowPaymentModal(true);
       return;
     }
 
@@ -229,13 +263,18 @@ const CashierSales = ({ user }) => {
           quantity: item.quantity,
           unit_price: item.unit_price,
           tax_rate: item.tax_rate
-        }))
+        })),
+        payment_method: method
       };
 
       const sale = await salesAPI.createSale(saleData);
+      // Eğer backend aynen döndürmüyorsa ekle
+      if (!sale.payment_method) sale.payment_method = method;
 
       setCurrentSale(sale);
       clearCart();
+      setPaymentMethod(null);
+      setShowPaymentModal(false);
 
       toast({
         title: "Satış tamamlandı",
@@ -319,6 +358,7 @@ const CashierSales = ({ user }) => {
         <div><strong>Belge:</strong> Satış Fişi</div>
         <div><strong>Tarih:</strong> ${formatDate(currentSale.created_at)}</div>
         <div><strong>Kasiyer:</strong> ${user.full_name}</div>
+        <div><strong>Ödeme:</strong> ${currentSale.payment_method === 'cash' ? 'Nakit' : currentSale.payment_method === 'card' ? 'Kredi Kartı' : '-'}</div>
       </div>
       <table>
         <thead>
@@ -457,6 +497,15 @@ const CashierSales = ({ user }) => {
                       >
                         <Trash2 className="h-3 w-3 text-red-500" />
                       </Button>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Fiyatı değiştir"
+                        onClick={() => overridePrice(item.product_id)}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </Button>
                     </div>
 
                     <div className="text-right ml-4">
@@ -567,7 +616,7 @@ const CashierSales = ({ user }) => {
             </div>
 
             <Button
-              onClick={processSale}
+              onClick={() => processSale(paymentMethod)}
               disabled={cart.length === 0 || isProcessing}
               className="w-full h-12 text-lg"
             >
@@ -585,6 +634,32 @@ const CashierSales = ({ user }) => {
             </Button>
           </CardContent>
         </Card>
+        {/* Payment method modal */}
+        {showPaymentModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-sm">
+              <CardHeader>
+                <CardTitle>Ödeme Yöntemi</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant={paymentMethod === 'cash' ? 'default' : 'outline'} onClick={() => setPaymentMethod('cash')}>
+                    <Wallet className="h-4 w-4 mr-2" />Nakit
+                  </Button>
+                  <Button variant={paymentMethod === 'card' ? 'default' : 'outline'} onClick={() => setPaymentMethod('card')}>
+                    <CreditCard className="h-4 w-4 mr-2" />Kredi Kartı
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button className="flex-1" onClick={() => processSale(paymentMethod)} disabled={!paymentMethod || isProcessing}>Tamamla</Button>
+                  <Button variant="outline" onClick={() => { setShowPaymentModal(false); setPaymentMethod(null); }}>
+                    İptal
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
 
       {/* Sale Receipt Modal (rendered in portal to avoid DOM reconciliation issues) */}

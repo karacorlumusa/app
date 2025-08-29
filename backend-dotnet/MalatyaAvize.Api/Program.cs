@@ -74,6 +74,7 @@ builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<StockService>();
 builder.Services.AddScoped<SalesService>();
+builder.Services.AddScoped<FinanceService>();
 
 var app = builder.Build();
 
@@ -365,6 +366,51 @@ app.MapGet("/api/sales/reports/irsaliye", async (SalesService svc, ClaimsPrincip
     var pdf = await svc.GenerateIrsaliyePdfAsync(sales, start, end, company, address);
     var fileName = $"irsaliye_{start:yyyy-MM}.pdf";
     return Results.File(pdf, "application/pdf", fileName);
+}).RequireAuthorization();
+
+// Finance
+app.MapGet("/api/finance/transactions", async (FinanceService svc, int? skip = null, int? limit = null, DateTime? start_date = null, DateTime? end_date = null, string? type = null, string? search = null) =>
+{
+    FinanceType? parsedType = null;
+    if (!string.IsNullOrWhiteSpace(type) && !string.Equals(type, "all", StringComparison.OrdinalIgnoreCase))
+    {
+        if (Enum.TryParse<FinanceType>(type, true, out var t)) parsedType = t;
+    }
+    var sk = skip ?? 0;
+    var lm = limit ?? 50;
+    var list = await svc.GetAsync(sk, Math.Clamp(lm <= 0 ? 100 : lm, 1, 1000), start_date, end_date, parsedType, search);
+    return Results.Ok(list);
+}).RequireAuthorization();
+
+app.MapPost("/api/finance/transactions", async (FinanceService svc, ClaimsPrincipal principal, FinanceTransactionCreateDto body) =>
+{
+    var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+    var fullName = principal.Identity?.Name ?? string.Empty;
+    var tx = await svc.CreateAsync(body, userId, fullName);
+    return Results.Ok(tx);
+}).RequireAuthorization();
+
+app.MapPut("/api/finance/transactions/{id}", async (FinanceService svc, string id, FinanceTransactionUpdateDto body) =>
+{
+    var tx = await svc.UpdateAsync(id, body);
+    return tx is null ? Results.NotFound() : Results.Ok(tx);
+}).RequireAuthorization();
+
+app.MapDelete("/api/finance/transactions/{id}", async (FinanceService svc, string id) =>
+{
+    var ok = await svc.DeleteAsync(id);
+    return ok ? Results.Ok(new { ok = true }) : Results.NotFound();
+}).RequireAuthorization();
+
+app.MapGet("/api/finance/summary", async (FinanceService svc, DateTime? start_date, DateTime? end_date, string? type) =>
+{
+    FinanceType? parsedType = null;
+    if (!string.IsNullOrWhiteSpace(type) && !string.Equals(type, "all", StringComparison.OrdinalIgnoreCase))
+    {
+        if (Enum.TryParse<FinanceType>(type, true, out var t)) parsedType = t;
+    }
+    var s = await svc.GetSummaryAsync(start_date, end_date, parsedType);
+    return Results.Ok(s);
 }).RequireAuthorization();
 
 // Dashboard

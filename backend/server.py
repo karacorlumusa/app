@@ -13,7 +13,7 @@ from typing import List, Optional
 from .models import *
 from .database import connect_to_mongo, close_mongo_connection
 from .auth import authenticate_user, create_access_token, get_current_user, get_current_admin_user, create_admin_user_if_not_exists
-from .services import UserService, ProductService, StockService, SalesService, DashboardService
+from .services import UserService, ProductService, StockService, SalesService, DashboardService, FinanceService
 
 # Load environment variables
 ROOT_DIR = Path(__file__).parent
@@ -34,7 +34,7 @@ app = FastAPI(
 )
 
 # CORS middleware (read allowed origins from env, comma-separated)
-origins_env = os.getenv("CORS_ORIGINS", "http://localhost:3000")
+origins_env = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
 allow_origins = [o.strip() for o in origins_env.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -223,7 +223,14 @@ async def create_stock_movement(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        movement = await StockService.create_movement(movement_data, current_user.id)
+        # Cashiers cannot set price/supplier; sanitize input for cashiers
+        if current_user.role == UserRole.cashier:
+            clean = movement_data.dict()
+            clean["unit_price"] = None
+            clean["supplier"] = None
+            movement = await StockService.create_movement(StockMovementCreate(**clean), current_user.id)
+        else:
+            movement = await StockService.create_movement(movement_data, current_user.id)
         return movement
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -340,34 +347,42 @@ async def get_irsaliye_pdf(
         elements.append(Spacer(1, 8))
 
         # Table header per typical irsaliye content
-        data = [["Tarih", "Satış No", "Ürün Adedi", "Ara Toplam", "KDV", "Toplam"]]
+        data = [["Tarih", "Satış No", "Ödeme", "Ürün Adedi", "Ara Toplam", "KDV", "Toplam"]]
 
         total_sub = 0.0
         total_tax = 0.0
         total_sum = 0.0
+
+        def fmt_tr(amount: float) -> str:
+            try:
+                return f"{amount:,.2f}"
+            except Exception:
+                return str(round(amount, 2))
 
         for s in sales:
             item_count = sum([i.quantity for i in s.items])
             data.append([
                 s.created_at.strftime('%d.%m.%Y %H:%M'),
                 s.id[-8:],
+                ("Nakit" if getattr(s, "payment_method", None) == "cash" else ("Kredi Kartı" if getattr(s, "payment_method", None) == "card" else "-")),
                 item_count,
-                f"{s.subtotal:,.2f}",
-                f"{s.tax_amount:,.2f}",
-                f"{s.total:,.2f}",
+                fmt_tr(s.subtotal),
+                fmt_tr(s.tax_amount),
+                fmt_tr(s.total),
             ])
             total_sub += s.subtotal
             total_tax += s.tax_amount
             total_sum += s.total
 
         # totals row
-        data.append(["", "TOPLAMLAR", "", f"{total_sub:,.2f}", f"{total_tax:,.2f}", f"{total_sum:,.2f}"])
+        data.append(["", "TOPLAMLAR", "", "", fmt_tr(total_sub), fmt_tr(total_tax), fmt_tr(total_sum)])
 
         table = Table(data, repeatRows=1)
         table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
             ('TEXTCOLOR', (0,0), (-1,0), colors.black),
-            ('ALIGN', (2,1), (-1,-1), 'RIGHT'),
+            # Right-align numeric columns starting at Ürün Adedi (index 3)
+            ('ALIGN', (3,1), (-1,-1), 'RIGHT'),
             ('GRID', (0,0), (-1,-1), 0.25, colors.grey),
             ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
             ('BOTTOMPADDING', (0,0), (-1,0), 6),
@@ -386,6 +401,57 @@ async def get_irsaliye_pdf(
     except Exception as e:
         logger.error(f"Irsaliye PDF generation error: {e}")
         raise HTTPException(status_code=500, detail="Could not generate PDF")
+
+# Finance endpoints
+@api_router.get("/finance/transactions", response_model=List[FinanceTransaction])
+async def get_finance_transactions(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    type: Optional[FinanceType] = Query(None),
+    search: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user)
+):
+    # _probe param allows frontend to check availability; ignore it
+    return await FinanceService.get_transactions(skip=skip, limit=limit, start_date=start_date, end_date=end_date, type=type, search=search)
+
+@api_router.post("/finance/transactions", response_model=FinanceTransaction)
+async def create_finance_transaction(
+    data: FinanceTransactionCreate,
+    current_user: User = Depends(get_current_user)
+):
+    return await FinanceService.create_transaction(data, current_user)
+
+@api_router.put("/finance/transactions/{tx_id}", response_model=FinanceTransaction)
+async def update_finance_transaction(
+    tx_id: str,
+    update: FinanceTransactionUpdate,
+    current_user: User = Depends(get_current_user)
+):
+    tx = await FinanceService.update_transaction(tx_id, update)
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return tx
+
+@api_router.delete("/finance/transactions/{tx_id}")
+async def delete_finance_transaction(
+    tx_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    ok = await FinanceService.delete_transaction(tx_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    return {"ok": True}
+
+@api_router.get("/finance/summary")
+async def get_finance_summary(
+    start_date: Optional[datetime] = Query(None),
+    end_date: Optional[datetime] = Query(None),
+    type: Optional[FinanceType] = Query(None),
+    current_user: User = Depends(get_current_user)
+):
+    return await FinanceService.get_summary(start_date=start_date, end_date=end_date, type=type)
 
 # Dashboard endpoints
 @api_router.get("/dashboard/stats", response_model=DashboardStats)

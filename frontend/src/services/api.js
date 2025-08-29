@@ -200,3 +200,151 @@ export const dashboardAPI = {
 };
 
 export default api;
+
+// Finance API (Gelir-Gider)
+// Tries backend first; if unavailable, falls back to localStorage so UI remains usable.
+const LS_KEY = 'finance_transactions_v1';
+const loadFromLS = () => {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+const saveToLS = (items) => {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(items)); } catch { }
+};
+const genId = () => `${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+
+export const financeAPI = {
+  isBackendAvailable: async () => {
+    try {
+      // Probe transactions endpoint; if reachable and returns array/object, consider available
+      const response = await api.get('/finance/transactions', { params: { _probe: 1 } });
+      return response.status >= 200 && response.status < 300;
+    } catch {
+      return false;
+    }
+  },
+
+  getTransactions: async (params = {}) => {
+    try {
+      const response = await api.get('/finance/transactions', { params });
+      return response.data;
+    } catch (err) {
+      // Fallback to LS
+      const all = loadFromLS();
+      const { start_date, end_date, type, search } = params || {};
+      const start = start_date ? new Date(start_date).getTime() : null;
+      const end = end_date ? new Date(end_date).getTime() : null;
+      return all.filter(t => {
+        const ts = t.date ? new Date(t.date).getTime() : 0;
+        if (start && ts < start) return false;
+        if (end && ts > end) return false;
+        if (type && type !== 'all' && t.type !== type) return false;
+        if (search) {
+          const s = search.toLowerCase();
+          const hay = `${t.category || ''} ${t.description || ''} ${t.person || ''} ${t.created_by_name || ''}`.toLowerCase();
+          if (!hay.includes(s)) return false;
+        }
+        return true;
+      });
+    }
+  },
+
+  createTransaction: async (data) => {
+    try {
+      const response = await api.post('/finance/transactions', data);
+      return response.data;
+    } catch (err) {
+      // Fallback
+      const all = loadFromLS();
+      const item = { id: genId(), ...data };
+      all.unshift(item);
+      saveToLS(all);
+      return item;
+    }
+  },
+
+  updateTransaction: async (id, data) => {
+    try {
+      const response = await api.put(`/finance/transactions/${id}`, data);
+      return response.data;
+    } catch (err) {
+      const all = loadFromLS();
+      const idx = all.findIndex(i => i.id === id);
+      if (idx >= 0) {
+        all[idx] = { ...all[idx], ...data };
+        saveToLS(all);
+        return all[idx];
+      }
+      throw err;
+    }
+  },
+
+  deleteTransaction: async (id) => {
+    try {
+      const response = await api.delete(`/finance/transactions/${id}`);
+      return response.data;
+    } catch (err) {
+      const all = loadFromLS().filter(i => i.id !== id);
+      saveToLS(all);
+      return { ok: true };
+    }
+  },
+
+  getSummary: async (params = {}) => {
+    try {
+      const response = await api.get('/finance/summary', { params });
+      return response.data;
+    } catch (err) {
+      // Fallback compute using LS directly
+      const all = loadFromLS();
+      const { start_date, end_date, type } = params || {};
+      const start = start_date ? new Date(start_date).getTime() : null;
+      const end = end_date ? new Date(end_date).getTime() : null;
+      const list = all.filter(t => {
+        const ts = t.date ? new Date(t.date).getTime() : 0;
+        if (start && ts < start) return false;
+        if (end && ts > end) return false;
+        if (type && type !== 'all' && t.type !== type) return false;
+        return true;
+      });
+      const income = list.filter(i => i.type === 'income').reduce((s, i) => s + (i.amount || 0), 0);
+      const expense = list.filter(i => i.type === 'expense').reduce((s, i) => s + (i.amount || 0), 0);
+      return { income, expense, net: income - expense };
+    }
+  }
+};
+
+// Expose local storage for finance to support migration UX
+export const financeLocalStore = {
+  list: () => loadFromLS(),
+  clear: () => saveToLS([]),
+  saveAll: (items) => saveToLS(items)
+};
+
+// Strict backend-only Finance API (no fallbacks). Use this when data must be shared across users.
+export const financeAPIBackend = {
+  getTransactions: async (params = {}) => {
+    const response = await api.get('/finance/transactions', { params });
+    return response.data;
+  },
+  createTransaction: async (data) => {
+    const response = await api.post('/finance/transactions', data);
+    return response.data;
+  },
+  updateTransaction: async (id, data) => {
+    const response = await api.put(`/finance/transactions/${id}`, data);
+    return response.data;
+  },
+  deleteTransaction: async (id) => {
+    const response = await api.delete(`/finance/transactions/${id}`);
+    return response.data;
+  },
+  getSummary: async (params = {}) => {
+    const response = await api.get('/finance/summary', { params });
+    return response.data;
+  }
+};

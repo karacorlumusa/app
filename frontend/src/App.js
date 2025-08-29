@@ -11,7 +11,9 @@ import {
   Menu,
   X,
   Store,
-  LampCeiling
+  LampCeiling,
+  Wallet,
+  TrendingUp
 } from "lucide-react";
 import { Users } from "lucide-react";
 import { Button } from "./components/ui/button";
@@ -24,7 +26,9 @@ import ProductManagement from "./components/ProductManagement";
 import StockManagement from "./components/StockManagement";
 import CashierSales from "./components/CashierSales";
 import SalesReports from "./components/SalesReports";
+import Finance from "./components/Finance";
 import UsersManagement from "./components/UsersManagement";
+import CashierStock from "./components/CashierStock";
 
 function AppContent() {
   const { user, logout, loading } = useAuth();
@@ -79,6 +83,13 @@ function AppContent() {
       icon: BarChart3,
       component: SalesReports
     }
+    ,
+    {
+      path: '/finance',
+      name: 'Gelir / Gider',
+      icon: Wallet,
+      component: Finance
+    }
   ];
 
   const cashierMenuItems = [
@@ -87,6 +98,18 @@ function AppContent() {
       name: 'Satış İşlemleri',
       icon: ShoppingCart,
       component: CashierSales
+    },
+    {
+      path: '/stock-in',
+      name: 'Stok Girişi',
+      icon: TrendingUp,
+      component: CashierStock
+    },
+    {
+      path: '/finance',
+      name: 'Gelir / Gider',
+      icon: Wallet,
+      component: Finance
     }
   ];
 

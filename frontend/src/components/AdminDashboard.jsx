@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  BarChart3, 
-  Package, 
-  ShoppingCart, 
-  Users, 
-  TrendingUp, 
+import {
+  BarChart3,
+  Package,
+  ShoppingCart,
+  Users,
+  TrendingUp,
   AlertTriangle,
   DollarSign,
   Box
@@ -28,7 +28,7 @@ const AdminDashboard = () => {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      
+
       const [
         statsData,
         topProductsData,
@@ -48,7 +48,7 @@ const AdminDashboard = () => {
       setCashierPerformance(cashierData);
       setLowStockProducts(lowStockData);
       setRecentSales(salesData);
-      
+
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
     } finally {
@@ -156,7 +156,7 @@ const AdminDashboard = () => {
                 <p className="text-center text-gray-500 py-4">Henüz veri bulunmamaktadır</p>
               ) : (
                 topProducts.map((product, index) => (
-                  <div key={product.product_id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div key={`${product.product_id}-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className="bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">
                         {index + 1}
@@ -190,8 +190,8 @@ const AdminDashboard = () => {
               {lowStockProducts.length === 0 ? (
                 <p className="text-center text-gray-500 py-4">Stok uyarısı bulunmamaktadır</p>
               ) : (
-                lowStockProducts.slice(0, 5).map((product) => (
-                  <div key={product.id} className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
+                lowStockProducts.slice(0, 5).map((product, index) => (
+                  <div key={`${product.id}-${index}`} className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
                     <div>
                       <p className="font-medium text-sm">{product.name}</p>
                       <p className="text-xs text-gray-500">{product.category}</p>
@@ -221,8 +221,8 @@ const AdminDashboard = () => {
             {recentSales.length === 0 ? (
               <p className="text-center text-gray-500 py-4">Henüz satış bulunmamaktadır</p>
             ) : (
-              recentSales.map((sale) => (
-                <div key={sale.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+              recentSales.map((sale, index) => (
+                <div key={`${sale.id}-${index}`} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                   <div>
                     <p className="font-medium">Satış #{sale.id.slice(-8)}</p>
                     <p className="text-sm text-gray-500">Kasiyer ID: {sale.cashier_id.slice(-8)}</p>
