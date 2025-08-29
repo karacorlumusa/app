@@ -215,6 +215,18 @@ const SalesReports = () => {
           <td style="text-align:right;">${formatCurrency(i.unit_price)}</td>
           <td style="text-align:right;">${formatCurrency(i.total_price)}</td>
         </tr>`).join('');
+      const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+      const taxMap = {};
+      (sale.items || []).forEach(i => {
+        const rate = Number(i.tax_rate) || 0;
+        const net = (Number(i.unit_price) || 0) * (Number(i.quantity) || 0);
+        const tax = round2(net * (rate / 100));
+        taxMap[rate] = round2((taxMap[rate] || 0) + tax);
+      });
+      const taxRates = Object.keys(taxMap).map(r => Number(r)).sort((a, b) => b - a);
+      const breakdownRows = taxRates.map(r => `
+        <tr><th>KDV (%${r})</th><td>${formatCurrency(taxMap[r])}</td></tr>
+      `).join('');
       const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"/>
         <title>${title}</title>
         <style>
@@ -256,7 +268,7 @@ const SalesReports = () => {
     <table>
           <thead>
             <tr>
-      <th>Ürün</th><th>Adet</th><th>Birim</th><th>Toplam</th>
+  <th>Ürün</th><th>Adet</th><th>Birim (KDV Hariç)</th><th>Toplam (KDV Dahil)</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
@@ -264,7 +276,8 @@ const SalesReports = () => {
         <div class="totals">
           <table>
             <tr><th>Ara Toplam</th><td>${formatCurrency(sale.subtotal)}</td></tr>
-            <tr><th>KDV</th><td>${formatCurrency(sale.tax_amount)}</td></tr>
+            ${breakdownRows}
+            ${taxRates.length > 1 ? `<tr><th>KDV Toplam</th><td>${formatCurrency(sale.tax_amount)}</td></tr>` : ''}
             <tr><th>TOPLAM</th><td><strong>${formatCurrency(sale.total)}</strong></td></tr>
           </table>
         </div>

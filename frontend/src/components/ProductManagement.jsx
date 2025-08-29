@@ -234,17 +234,29 @@ const ProductManagement = () => {
   };
 
   const ProductForm = ({ product, onClose }) => {
-    const [formData, setFormData] = useState(product || {
-      barcode: '',
-      name: '',
-      category: '',
-      brand: '',
-      stock: 0,
-      min_stock: 0,
-      buy_price: 0,
-      sell_price: 0,
-      tax_rate: 18,
-      supplier: ''
+    // Initialize from existing product or last draft from localStorage for faster serial entry
+    const [formData, setFormData] = useState(() => {
+      if (product) return product;
+      try {
+        const saved = localStorage.getItem('pm.newProductDraft');
+        if (saved) return { ...JSON.parse(saved) };
+      } catch { }
+      return {
+        barcode: '',
+        name: '',
+        category: '',
+        brand: '',
+        stock: 0,
+        min_stock: 0,
+        buy_price: 0,
+        sell_price: 0,
+        tax_rate: 20,
+        supplier: ''
+      };
+    });
+    // Keep form open and retain values after save for serial adding
+    const [keepSerial, setKeepSerial] = useState(() => {
+      try { return JSON.parse(localStorage.getItem('pm.keepSerial') || 'true'); } catch { return true; }
     });
     const [saving, setSaving] = useState(false);
     const existingBarcodes = useMemo(() => new Set(products.map(p => String(p.barcode))), [products]);
@@ -325,6 +337,16 @@ const ProductManagement = () => {
       }
     };
 
+    // Persist draft locally while adding new products (not during edit)
+    useEffect(() => {
+      if (!product) {
+        try { localStorage.setItem('pm.newProductDraft', JSON.stringify(formData)); } catch { }
+      }
+    }, [product, formData]);
+    useEffect(() => {
+      try { localStorage.setItem('pm.keepSerial', JSON.stringify(keepSerial)); } catch { }
+    }, [keepSerial]);
+
     const handleSubmit = async (e) => {
       e.preventDefault();
       setSaving(true);
@@ -337,6 +359,8 @@ const ProductManagement = () => {
             title: "Ürün güncellendi",
             description: "Ürün bilgileri başarıyla güncellendi.",
           });
+          onClose();
+          await loadProducts();
         } else {
           // Add new product
           await productsAPI.createProduct(formData);
@@ -344,10 +368,31 @@ const ProductManagement = () => {
             title: "Ürün eklendi",
             description: "Yeni ürün başarıyla eklendi.",
           });
+          // Serial add: keep form open and retain fields; just clear quick-changing ones
+          if (keepSerial) {
+            const next = {
+              ...formData,
+              barcode: '',
+              name: '',
+              stock: 0,
+              min_stock: 0,
+              buy_price: 0,
+              sell_price: 0
+            };
+            setFormData(next);
+            try { localStorage.setItem('pm.newProductDraft', JSON.stringify(next)); } catch { }
+            // Focus barcode for the next entry
+            requestAnimationFrame(() => {
+              const el = barcodeRef.current;
+              if (el) { el.focus(); try { el.setSelectionRange(0, 0); } catch { } }
+            });
+          } else {
+            // Optionally clear draft when closing
+            try { localStorage.removeItem('pm.newProductDraft'); } catch { }
+            onClose();
+          }
+          await loadProducts();
         }
-
-        onClose();
-        loadProducts();
       } catch (error) {
         console.error('Save error:', error);
         toast({
@@ -364,7 +409,19 @@ const ProductManagement = () => {
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
         <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
           <CardHeader>
-            <CardTitle>{product ? 'Ürün Düzenle' : 'Yeni Ürün Ekle'}</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              <span>{product ? 'Ürün Düzenle' : 'Yeni Ürün Ekle'}</span>
+              {!product && (
+                <label className="text-xs flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={keepSerial}
+                    onChange={(e) => setKeepSerial(e.target.checked)}
+                  />
+                  Seri ekleme (kaydet sonra açık kalsın)
+                </label>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -466,17 +523,17 @@ const ProductManagement = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Satış Fiyatı (KDV Dahil) (₺)</label>
+                  <label className="block text-sm font-medium mb-1">Satış Fiyatı (KDV Hariç) (₺)</label>
                   <Input
                     type="number"
                     step="0.01"
                     value={formData.sell_price}
                     onChange={(e) => setFormData({ ...formData, sell_price: parseFloat(e.target.value) || 0 })}
-                    placeholder="Satış fiyatı (KDV dahil)"
+                    placeholder="Satış fiyatı (KDV hariç)"
                     min="0"
                     required
                   />
-                  <p className="mt-1 text-xs text-gray-500">Bu alan KDV dahil fiyatı temsil eder.</p>
+                  <p className="mt-1 text-xs text-gray-500">Bu alan KDV hariç birim fiyatı temsil eder. KDV satışta ayrıca hesaplanır.</p>
                 </div>
 
                 <div>
@@ -486,9 +543,10 @@ const ProductManagement = () => {
                     onChange={(e) => setFormData({ ...formData, tax_rate: parseInt(e.target.value) })}
                     className="w-full px-3 py-2 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value={1}>%1</option>
-                    <option value={8}>%8</option>
+                    <option value={20}>%20</option>
                     <option value={18}>%18</option>
+                    <option value={8}>%8</option>
+                    <option value={1}>%1</option>
                   </select>
                 </div>
 
@@ -600,7 +658,7 @@ const ProductManagement = () => {
                     <th className="text-left py-2">Barkod</th>
                     <th className="text-left py-2">Stok</th>
                     <th className="text-left py-2">Alış Fiyatı</th>
-                    <th className="text-left py-2">Satış Fiyatı (KDV Dahil)</th>
+                    <th className="text-left py-2">Satış Fiyatı (KDV Hariç)</th>
                     <th className="text-left py-2">Kar Marjı</th>
                     <th className="text-right py-2">İşlemler</th>
                   </tr>

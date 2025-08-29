@@ -124,9 +124,9 @@ const CashierSales = ({ user }) => {
           ? {
             ...item,
             quantity: newQuantity,
-            unit_price: product.sell_price,
+            unit_price: product.sell_price, // net price
             buy_price: product.buy_price,
-            total_price: newQuantity * product.sell_price
+            total_price: newQuantity * product.sell_price // store net subtotal; gross shown via summary
           }
           : item
       ));
@@ -138,10 +138,10 @@ const CashierSales = ({ user }) => {
         barcode: product.barcode,
         product_name: product.name,
         quantity: quantity,
-        unit_price: product.sell_price,
+        unit_price: product.sell_price, // net price
         buy_price: product.buy_price,
         tax_rate: product.tax_rate,
-        total_price: quantity * product.sell_price,
+        total_price: quantity * product.sell_price, // net subtotal for internal calc
         available_stock: product.stock
       };
       setCart([...cart, cartItem]);
@@ -179,12 +179,12 @@ const CashierSales = ({ user }) => {
     ));
   };
 
-  // Override item price (VAT-inclusive)
+  // Override item price (VAT-exclusive / KDV Hariç)
   const overridePrice = (productId) => {
     const item = cart.find(i => i.product_id === productId);
     if (!item) return;
     const current = Number(item.unit_price) || 0;
-    const input = window.prompt('Yeni Birim Fiyat (KDV Dahil) ₺', current.toString().replace('.', ','));
+    const input = window.prompt('Yeni Birim Fiyat (KDV Hariç) ₺', current.toString().replace('.', ','));
     if (input == null) return; // cancelled
     const normalized = input.replace(',', '.');
     const val = parseFloat(normalized);
@@ -195,6 +195,7 @@ const CashierSales = ({ user }) => {
     setCart(cart.map(i => i.product_id === productId ? {
       ...i,
       unit_price: val,
+      // total_price will be recomputed contextually below for display; keep as net*qty here for consistency
       total_price: val * i.quantity
     } : i));
     // Yardım paneli güncellemesi (eğer bu ürüne bakıyorsak)
@@ -215,16 +216,17 @@ const CashierSales = ({ user }) => {
     setQuantityInput(1);
   };
 
-  // Calculate totals (VAT-inclusive pricing):
-  // - item.unit_price and item.total_price are gross (KDV dahil)
-  // - derive net and tax from gross so we don't add KDV on top again
+  // Calculate totals (VAT-exclusive pricing):
+  // - item.unit_price is net (KDV hariç)
+  // - compute tax and gross on top for the summary
   const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
   const totals = cart.reduce(
     (acc, item) => {
-      const gross = item.total_price || 0; // quantity * unit_price (KDV dahil)
+      const qty = item.quantity || 0;
+      const net = (item.unit_price || 0) * qty;
       const rate = ((item.tax_rate ?? 0) / 100);
-      const net = rate > 0 ? gross / (1 + rate) : gross;
-      const tax = gross - net;
+      const tax = net * rate;
+      const gross = net + tax;
       acc.subtotal += net;
       acc.tax += tax;
       acc.total += gross;
@@ -320,6 +322,20 @@ const CashierSales = ({ user }) => {
         <td style="text-align:right;">${formatCurrency(i.total_price)}</td>
       </tr>`).join('');
 
+    // KDV breakdown by rate (derived from net unit price and quantity)
+    const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+    const taxMap = {};
+    (currentSale.items || []).forEach(i => {
+      const rate = Number(i.tax_rate) || 0;
+      const net = (Number(i.unit_price) || 0) * (Number(i.quantity) || 0);
+      const tax = round2(net * (rate / 100));
+      taxMap[rate] = round2((taxMap[rate] || 0) + tax);
+    });
+    const taxRates = Object.keys(taxMap).map(r => Number(r)).sort((a, b) => b - a);
+    const breakdownRows = taxRates.map(r => `
+      <tr><th>KDV (%${r})</th><td>${formatCurrency(taxMap[r])}</td></tr>
+    `).join('');
+
     const title = `Satış Fişi - ${COMPANY_NAME} - ${currentSale.id || ''}`;
     const html = `<!doctype html><html lang="tr"><head><meta charset="utf-8"/>
       <title>${title}</title>
@@ -362,14 +378,15 @@ const CashierSales = ({ user }) => {
       </div>
       <table>
         <thead>
-          <tr><th>Ürün</th><th>Adet</th><th>Birim</th><th>Toplam</th></tr>
+          <tr><th>Ürün</th><th>Adet</th><th>Birim (KDV Hariç)</th><th>Toplam (KDV Dahil)</th></tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
       <div class="totals">
         <table>
           <tr><th>Ara Toplam</th><td>${formatCurrency(currentSale.subtotal)}</td></tr>
-          <tr><th>KDV</th><td>${formatCurrency(currentSale.tax_amount)}</td></tr>
+          ${breakdownRows}
+          ${taxRates.length > 1 ? `<tr><th>KDV Toplam</th><td>${formatCurrency(currentSale.tax_amount)}</td></tr>` : ''}
           <tr><th>TOPLAM</th><td><strong>${formatCurrency(currentSale.total)}</strong></td></tr>
         </table>
       </div>
@@ -509,7 +526,13 @@ const CashierSales = ({ user }) => {
                     </div>
 
                     <div className="text-right ml-4">
-                      <p className="font-bold">{formatCurrency(item.total_price)}</p>
+                      {(() => {
+                        const qty = item.quantity || 0;
+                        const net = (item.unit_price || 0) * qty;
+                        const rate = ((item.tax_rate ?? 0) / 100);
+                        const gross = net + net * rate;
+                        return <p className="font-bold">{formatCurrency(Math.round((gross + Number.EPSILON) * 100) / 100)}</p>;
+                      })()}
                     </div>
                   </div>
                 ))}
@@ -564,7 +587,7 @@ const CashierSales = ({ user }) => {
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-gray-500">
-                    <span>Satış:</span>
+                    <span>Satış (KDV Hariç):</span>
                     <span>{formatCurrency(lastScannedInfo.sell_price || 0)}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-gray-500">

@@ -33,13 +33,11 @@ public class SalesService
         double subtotal = 0, taxAmount = 0, total = 0;
         foreach (var i in dto.Items)
         {
-            // Interpret unit price as VAT-inclusive (gross). Do NOT add KDV on top.
-            var grossItemTotal = Math.Round(i.Unit_Price * i.Quantity, 2);
+            // Interpret unit price as VAT-exclusive (net). Add KDV on top.
             var rate = (i.Tax_Rate / 100.0);
-            var netItemTotal = i.Tax_Rate > 0
-                ? Math.Round(grossItemTotal / (1 + rate), 2)
-                : grossItemTotal;
-            var itemTax = Math.Round(grossItemTotal - netItemTotal, 2);
+            var netItemTotal = Math.Round(i.Unit_Price * i.Quantity, 2);
+            var itemTax = Math.Round(netItemTotal * rate, 2);
+            var grossItemTotal = Math.Round(netItemTotal + itemTax, 2);
 
             items.Add(new SaleItem
             {
@@ -47,7 +45,7 @@ public class SalesService
                 Barcode = i.Barcode,
                 Product_Name = i.Product_Name,
                 Quantity = i.Quantity,
-                Unit_Price = i.Unit_Price, // gross per unit
+                Unit_Price = i.Unit_Price, // net per unit
                 Tax_Rate = i.Tax_Rate,
                 Total_Price = grossItemTotal // store gross total per line
             });
@@ -149,7 +147,7 @@ public class SalesService
                             h.Cell().Element(HeaderCell).Text("Kasiyer");
                             h.Cell().Element(HeaderCell).Text("Ürün Adedi");
                             h.Cell().Element(HeaderCell).Text("Ara Toplam");
-                            h.Cell().Element(HeaderCell).Text("KDV");
+                            h.Cell().Element(HeaderCell).Text("KDV (% Oran)");
                             h.Cell().Element(HeaderCell).Text("Toplam");
                         });
 
