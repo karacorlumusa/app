@@ -183,51 +183,66 @@ app.MapGet("/api/products/generate-barcode", async (ClaimsPrincipal principal, P
 }).RequireAuthorization();
 
 // Seed default users/products on first run (dev parity)
-app.MapPost("/api/dev/seed", async (MongoContext db) =>
+// Dynamic DEV seed (no hardcoded data). Requires Development env + admin.
+app.MapPost("/api/dev/seed", async (
+    ClaimsPrincipal principal,
+    MongoContext db,
+    UserService userSvc,
+    ProductService productSvc,
+    SeedRequest req
+) =>
 {
-    var count = await db.Users.CountDocumentsAsync(_ => true);
-    if (count == 0)
-    {
-        var admin = new User
-        {
-            Username = "admin",
-            Full_Name = "İbrahim Usta",
-            Email = "admin@elektrikdukkani.com",
-            Role = UserRole.admin,
-            Active = true,
-            Password_Hash = BCrypt.Net.BCrypt.HashPassword("admin123")
-        };
-        var cashier = new User
-        {
-            Username = "kasiyer1",
-            Full_Name = "Ahmet Yılmaz",
-            Email = "ahmet@elektrikdukkani.com",
-            Role = UserRole.cashier,
-            Active = true,
-            Password_Hash = BCrypt.Net.BCrypt.HashPassword("kasiyer123")
-        };
-        await db.Users.InsertManyAsync(new[] { admin, cashier });
+    if (!app.Environment.IsDevelopment()) return Results.Forbid();
+    var role = principal.FindFirstValue(ClaimTypes.Role);
+    if (!string.Equals(role, nameof(UserRole.admin), StringComparison.OrdinalIgnoreCase)) return Results.Forbid();
 
-        // Insert sample products similar to Python
-        var prods = new List<Product>
-        {
-            new() { Barcode = "8690123456789", Name = "LED Ampul 9W E27 Beyaz Işık", Category = "Aydınlatma", Brand = "Philips", Stock = 45, MinStock = 10, BuyPrice = 12.50, SellPrice = 18.90, TaxRate = 18, Supplier = "Elektrik Toptan AŞ" },
-            new() { Barcode = "8690987654321", Name = "Kablo 2.5mm NYA Siyah (100m)", Category = "Kablolar", Brand = "Nexans", Stock = 8, MinStock = 5, BuyPrice = 185.00, SellPrice = 285.00, TaxRate = 18, Supplier = "Kablo Dünyası" }
-        };
-        await db.Products.InsertManyAsync(prods);
+    var summary = new { created_users = 0, created_products = 0, cleared = false };
+
+    // Optionally clear
+    if (req.Clear == true)
+    {
+        await db.Users.DeleteManyAsync(_ => true);
+        await db.Products.DeleteManyAsync(_ => true);
+        await db.Sales.DeleteManyAsync(_ => true);
+        await db.StockMovements.DeleteManyAsync(_ => true);
+        await db.Finance.DeleteManyAsync(_ => true);
+        summary = new { created_users = 0, created_products = 0, cleared = true };
     }
-    return Results.Ok(new { message = "Seed complete" });
-});
+
+    var usersCount = 0;
+    if (req.Users != null)
+    {
+        foreach (var u in req.Users)
+        {
+            try { await userSvc.CreateAsync(u); usersCount++; } catch { /* skip duplicates */ }
+        }
+    }
+
+    var productsCount = 0;
+    if (req.Products != null)
+    {
+        foreach (var p in req.Products)
+        {
+            try { await productSvc.CreateAsync(p); productsCount++; } catch { /* skip duplicates */ }
+        }
+    }
+
+    return Results.Ok(new { message = "Seed complete", cleared = summary.cleared, created_users = usersCount, created_products = productsCount });
+}).RequireAuthorization();
 
 // DEV ONLY: set password for a user (useful to reset admin password during debugging)
-app.MapPost("/api/dev/set-password", async (MongoContext db, string username, string password) =>
+app.MapPost("/api/dev/set-password", async (ClaimsPrincipal principal, MongoContext db, string username, string password) =>
 {
+    if (!app.Environment.IsDevelopment()) return Results.Forbid();
+    var role = principal.FindFirstValue(ClaimTypes.Role);
+    if (!string.Equals(role, nameof(UserRole.admin), StringComparison.OrdinalIgnoreCase)) return Results.Forbid();
     var user = await db.Users.Find(x => x.Username == username).FirstOrDefaultAsync();
     if (user is null) return Results.NotFound(new { detail = "User not found" });
     user.Password_Hash = BCrypt.Net.BCrypt.HashPassword(password);
     await db.Users.ReplaceOneAsync(x => x.Id == user.Id, user);
     return Results.Ok(new { message = "Password updated" });
-});
+}).RequireAuthorization();
+
 
 // Users (admin-only) - for simplicity, authorization attribute only; implement role check later if needed
 app.MapGet("/api/users", async (ClaimsPrincipal principal, UserService svc, int skip = 0, int limit = 50) =>

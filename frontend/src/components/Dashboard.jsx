@@ -2,26 +2,25 @@ import React from 'react';
 import { BarChart3, Scan, History, TrendingUp, Package, Calendar } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { mockBarcodes } from '../mock/mockData';
 
 const Dashboard = ({ scannedBarcodes = [] }) => {
-  // Combine mock data with newly scanned barcodes
-  const allBarcodes = [...mockBarcodes, ...scannedBarcodes];
-  
+  // Use only provided scanned barcodes (no mock data)
+  const allBarcodes = scannedBarcodes;
+
   // Calculate statistics
   const totalScans = allBarcodes.length;
   const todayScans = allBarcodes.filter(item => {
     const today = new Date().toDateString();
     return new Date(item.scannedAt).toDateString() === today;
   }).length;
-  
+
   const uniqueProducts = new Set(allBarcodes.map(item => item.product)).size;
-  
+
   const typeStats = allBarcodes.reduce((acc, item) => {
     acc[item.type] = (acc[item.type] || 0) + 1;
     return acc;
   }, {});
-  
+
   const locationStats = allBarcodes.reduce((acc, item) => {
     acc[item.location] = (acc[item.location] || 0) + 1;
     return acc;
@@ -172,7 +171,7 @@ const Dashboard = ({ scannedBarcodes = [] }) => {
                 </p>
               ) : (
                 Object.entries(typeStats)
-                  .sort(([,a], [,b]) => b - a)
+                  .sort(([, a], [, b]) => b - a)
                   .map(([type, count]) => (
                     <div key={type} className="flex justify-between items-center">
                       <div className="flex items-center gap-2">
@@ -180,10 +179,10 @@ const Dashboard = ({ scannedBarcodes = [] }) => {
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="bg-gray-200 rounded-full h-2 w-20">
-                          <div 
+                          <div
                             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ 
-                              width: `${(count / totalScans) * 100}%` 
+                            style={{
+                              width: `${(count / totalScans) * 100}%`
                             }}
                           />
                         </div>
@@ -210,7 +209,7 @@ const Dashboard = ({ scannedBarcodes = [] }) => {
               </p>
             ) : (
               Object.entries(locationStats)
-                .sort(([,a], [,b]) => b - a)
+                .sort(([, a], [, b]) => b - a)
                 .map(([location, count]) => (
                   <div key={location} className="bg-gray-50 p-4 rounded-lg">
                     <div className="flex justify-between items-center mb-2">
@@ -218,10 +217,10 @@ const Dashboard = ({ scannedBarcodes = [] }) => {
                       <Badge variant="outline">{count}</Badge>
                     </div>
                     <div className="bg-gray-200 rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                        style={{ 
-                          width: `${(count / totalScans) * 100}%` 
+                        style={{
+                          width: `${(count / totalScans) * 100}%`
                         }}
                       />
                     </div>

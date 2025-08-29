@@ -4,7 +4,6 @@ import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { simulateScan } from '../mock/mockData';
 import { useToast } from '../hooks/use-toast';
 
 const BarcodeScanner = ({ onScanComplete }) => {
@@ -16,14 +15,14 @@ const BarcodeScanner = ({ onScanComplete }) => {
 
   const startCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
           facingMode: 'environment',
           width: { ideal: 1280 },
           height: { ideal: 720 }
-        } 
+        }
       });
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         setCameraActive(true);
@@ -56,29 +55,18 @@ const BarcodeScanner = ({ onScanComplete }) => {
     if (!cameraActive) {
       await startCamera();
     }
-    
+
     setIsScanning(true);
     setScanResult(null);
-    
+
     try {
-      // Using mock scan for now
-      const result = await simulateScan();
-      setScanResult(result);
-      setIsScanning(false);
-      
-      if (onScanComplete) {
-        onScanComplete(result);
-      }
-      
-      toast({
-        title: "Barkod başarıyla okundu!",
-        description: `${result.type}: ${result.barcode}`,
-      });
+      // TODO: Entegrasyon: Gerçek barkod okuyucu veya kamera tabanlı okuma sonucu burada set edilecek
+      throw new Error('no-mock');
     } catch (error) {
       setIsScanning(false);
       toast({
-        title: "Tarama hatası",
-        description: "Barkod okunamadı, tekrar deneyin",
+        title: "Tarama henüz etkin değil",
+        description: "Barkod okuyucu entegrasyonu eklendiğinde aktif olacak",
         variant: "destructive"
       });
     }
@@ -115,7 +103,7 @@ const BarcodeScanner = ({ onScanComplete }) => {
                 </div>
               </div>
             )}
-            
+
             {/* Scanning Overlay */}
             {isScanning && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/20">
@@ -140,8 +128,8 @@ const BarcodeScanner = ({ onScanComplete }) => {
               </Button>
             ) : (
               <>
-                <Button 
-                  onClick={startScan} 
+                <Button
+                  onClick={startScan}
                   disabled={isScanning}
                   className="flex-1"
                 >
@@ -157,8 +145,8 @@ const BarcodeScanner = ({ onScanComplete }) => {
                     </>
                   )}
                 </Button>
-                <Button 
-                  onClick={stopCamera} 
+                <Button
+                  onClick={stopCamera}
                   variant="outline"
                   size="icon"
                 >
@@ -187,17 +175,17 @@ const BarcodeScanner = ({ onScanComplete }) => {
                   {scanResult.barcode}
                 </code>
               </div>
-              
+
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-600">Tip:</span>
                 <Badge variant="secondary">{scanResult.type}</Badge>
               </div>
-              
+
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-600">Ürün:</span>
                 <span className="text-sm font-medium">{scanResult.product}</span>
               </div>
-              
+
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-gray-600">Güvenilirlik:</span>
                 <Badge variant="outline">
@@ -206,10 +194,10 @@ const BarcodeScanner = ({ onScanComplete }) => {
               </div>
             </div>
 
-            <Button 
-              onClick={resetScan} 
-              variant="outline" 
-              size="sm" 
+            <Button
+              onClick={resetScan}
+              variant="outline"
+              size="sm"
               className="w-full"
             >
               <X className="h-4 w-4 mr-2" />
@@ -223,7 +211,7 @@ const BarcodeScanner = ({ onScanComplete }) => {
       <Alert>
         <History className="h-4 w-4" />
         <AlertDescription>
-          Barkodu kameranın önüne getirin ve "Tara" butonuna basın. 
+          Barkodu kameranın önüne getirin ve "Tara" butonuna basın.
           Uygulama otomatik olarak barkodu algılayacaktır.
         </AlertDescription>
       </Alert>

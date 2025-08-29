@@ -5,24 +5,23 @@ import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { mockBarcodes } from '../mock/mockData';
 
 const BarcodeHistory = ({ scannedBarcodes = [] }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
-  
-  // Combine mock data with any newly scanned barcodes
-  const allBarcodes = [...mockBarcodes, ...scannedBarcodes];
+
+  // Use only provided scanned barcodes (no mock data)
+  const allBarcodes = scannedBarcodes;
 
   // Filter barcodes based on search and type
   const filteredBarcodes = allBarcodes.filter(item => {
-    const matchesSearch = 
+    const matchesSearch =
       item.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.product.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.location.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesType = filterType === 'all' || item.type === filterType;
-    
+
     return matchesSearch && matchesType;
   });
 
@@ -84,7 +83,7 @@ const BarcodeHistory = ({ scannedBarcodes = [] }) => {
                 className="pl-10"
               />
             </div>
-            
+
             <div className="flex gap-2">
               <select
                 value={filterType}
@@ -96,10 +95,10 @@ const BarcodeHistory = ({ scannedBarcodes = [] }) => {
                   <option key={type} value={type}>{type}</option>
                 ))}
               </select>
-              
-              <Button 
+
+              <Button
                 onClick={clearHistory}
-                variant="outline" 
+                variant="outline"
                 size="sm"
                 className="whitespace-nowrap"
               >
@@ -114,7 +113,7 @@ const BarcodeHistory = ({ scannedBarcodes = [] }) => {
             <Alert>
               <Package className="h-4 w-4" />
               <AlertDescription>
-                {allBarcodes.length === 0 
+                {allBarcodes.length === 0
                   ? "Henüz barkod taraması yapılmadı."
                   : "Arama kriterlerinize uygun sonuç bulunamadı."
                 }
@@ -135,28 +134,28 @@ const BarcodeHistory = ({ scannedBarcodes = [] }) => {
                             {item.type}
                           </Badge>
                         </div>
-                        
+
                         <div className="flex items-center gap-1 text-sm text-gray-600">
                           <Package className="h-4 w-4" />
                           <span className="font-medium">{item.product}</span>
                         </div>
-                        
+
                         <div className="flex items-center gap-4 text-xs text-gray-500">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             {formatDate(item.scannedAt)}
                           </div>
-                          
+
                           <div className="flex items-center gap-1">
                             <MapPin className="h-3 w-3" />
                             {item.location}
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="flex gap-2">
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={() => navigator.clipboard.writeText(item.barcode)}
                         >

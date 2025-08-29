@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("MalatyaAvize.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+1a1be78c5bbd9493576ae899df0e21453afa7ea5")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6a154a9dd325f580f47cf1e5bab51e4af0e85fdc")]
 [assembly: System.Reflection.AssemblyProductAttribute("MalatyaAvize.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MalatyaAvize.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
