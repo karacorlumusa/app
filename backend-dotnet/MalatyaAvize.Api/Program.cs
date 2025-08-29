@@ -89,6 +89,8 @@ if (app.Environment.IsDevelopment())
 }
 
 app.MapGet("/api", () => Results.Ok(new { message = "Malatya Avize Dünyası .NET API", status = "running" }));
+// Lightweight health/probe for auth
+app.MapGet("/api/auth/me/health", () => Results.Ok(new { status = "ok" }));
 app.MapPost("/api/auth/login", async (AuthService auth, MongoContext db, LoginRequest body) =>
 {
     var user = await auth.AuthenticateAsync(body.Username, body.Password);
@@ -242,6 +244,27 @@ app.MapPost("/api/dev/set-password", async (ClaimsPrincipal principal, MongoCont
     await db.Users.ReplaceOneAsync(x => x.Id == user.Id, user);
     return Results.Ok(new { message = "Password updated" });
 }).RequireAuthorization();
+
+// DEV ONLY: Bootstrap first admin if database has no users
+app.MapPost("/api/dev/bootstrap-admin", async (MongoContext db, BootstrapAdminRequest req) =>
+{
+    if (!app.Environment.IsDevelopment()) return Results.Forbid();
+    var count = await db.Users.CountDocumentsAsync(_ => true);
+    if (count > 0) return Results.BadRequest(new { detail = "Users already exist" });
+    if (string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password))
+        return Results.BadRequest(new { detail = "username and password required" });
+    var user = new User
+    {
+        Username = req.Username.Trim(),
+        Full_Name = string.IsNullOrWhiteSpace(req.Full_Name) ? req.Username : req.Full_Name!.Trim(),
+        Email = req.Email,
+        Role = UserRole.admin,
+        Active = true,
+        Password_Hash = BCrypt.Net.BCrypt.HashPassword(req.Password)
+    };
+    await db.Users.InsertOneAsync(user);
+    return Results.Ok(new { message = "Admin created", id = user.Id, username = user.Username });
+});
 
 
 // Users (admin-only) - for simplicity, authorization attribute only; implement role check later if needed

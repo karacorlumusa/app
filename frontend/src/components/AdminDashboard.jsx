@@ -6,12 +6,12 @@ import {
   Users,
   TrendingUp,
   AlertTriangle,
-  DollarSign,
   Box
 } from 'lucide-react';
+import TurkishLira from './icons/TurkishLira';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { dashboardAPI, stockAPI, salesAPI } from '../services/api';
+import { dashboardAPI, stockAPI, salesAPI, usersAPI } from '../services/api';
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
@@ -20,9 +20,24 @@ const AdminDashboard = () => {
   const [lowStockProducts, setLowStockProducts] = useState([]);
   const [recentSales, setRecentSales] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [usersMap, setUsersMap] = useState({});
 
   useEffect(() => {
     loadDashboardData();
+    (async () => {
+      try {
+        const data = await usersAPI.getUsers();
+        const list = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+        const map = {};
+        list.forEach(u => {
+          const name = (u.full_name && u.full_name.trim()) ? u.full_name : u.username || u.id;
+          if (u.id) map[u.id] = name;
+        });
+        setUsersMap(map);
+      } catch {
+        // ignore
+      }
+    })();
   }, []);
 
   const loadDashboardData = async () => {
@@ -117,7 +132,7 @@ const AdminDashboard = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-purple-600" />
+              <TurkishLira className="h-4 w-4 text-purple-600" />
               Günlük Ciro
             </CardTitle>
           </CardHeader>
@@ -225,7 +240,9 @@ const AdminDashboard = () => {
                 <div key={`${sale.id}-${index}`} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                   <div>
                     <p className="font-medium">Satış #{sale.id.slice(-8)}</p>
-                    <p className="text-sm text-gray-500">Kasiyer ID: {sale.cashier_id.slice(-8)}</p>
+                    <p className="text-sm text-gray-500">
+                      Kasiyer: {usersMap[sale.cashier_id] || ''}
+                    </p>
                     <p className="text-xs text-gray-400">{formatDate(sale.created_at)}</p>
                   </div>
                   <div className="text-right">

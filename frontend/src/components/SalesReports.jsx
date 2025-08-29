@@ -3,13 +3,13 @@ import { createPortal } from 'react-dom';
 import {
   BarChart3,
   Calendar,
-  DollarSign,
   TrendingUp,
   Package,
   FileText,
   Download,
   Eye
 } from 'lucide-react';
+import TurkishLira from './icons/TurkishLira';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
@@ -387,7 +387,7 @@ const SalesReports = () => {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-green-600" />
+              <TurkishLira className="h-4 w-4 text-green-600" />
               Toplam Ciro
             </CardTitle>
           </CardHeader>
