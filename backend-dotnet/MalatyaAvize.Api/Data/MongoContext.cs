@@ -26,8 +26,18 @@ public class MongoContext
 
     private void EnsureIndexes()
     {
-        // Disabled to avoid conflicts with existing indices in a shared dev DB.
-        // Application enforces uniqueness at service layer.
+        // Create unique index on products.normalized_name to prevent duplicates like "LedAmpul" vs "Led Ampul".
+        try
+        {
+            var products = Products;
+            var indexKeys = Builders<Product>.IndexKeys.Ascending(p => p.NormalizedName);
+            var options = new CreateIndexOptions { Unique = true, Name = "ux_products_normalized_name", Sparse = true }; // allow empty values
+            products.Indexes.CreateOne(new CreateIndexModel<Product>(indexKeys, options));
+        }
+        catch
+        {
+            // Ignore index errors on environments where index already exists or cannot be created.
+        }
         return;
     }
 }

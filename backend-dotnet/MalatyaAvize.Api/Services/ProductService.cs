@@ -26,7 +26,11 @@ public static class ProductMappings
     public static void ApplyUpdate(this Product p, ProductUpdateDto u)
     {
         if (u.Barcode != null) p.Barcode = u.Barcode;
-        if (u.Name != null) p.Name = u.Name;
+        if (u.Name != null)
+        {
+            p.Name = u.Name;
+            p.NormalizedName = ProductService.NormalizeName(u.Name);
+        }
         if (u.Category != null) p.Category = u.Category;
         if (u.Brand != null) p.Brand = u.Brand;
         if (u.Stock.HasValue) p.Stock = u.Stock.Value;
@@ -46,6 +50,18 @@ public class ProductService
     public ProductService(MongoContext db)
     {
         _db = db;
+    }
+
+    // Normalize product names to detect duplicates independent of spacing, hyphens, case, turkish diacritics
+    public static string NormalizeName(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return string.Empty;
+        var s = raw.Trim().ToLowerInvariant();
+        // Replace common Turkish diacritics
+        s = s.Replace('ç', 'c').Replace('ğ', 'g').Replace('ı', 'i').Replace('i', 'i').Replace('ö', 'o').Replace('ş', 's').Replace('ü', 'u');
+        // Remove spaces, hyphens and underscores
+        s = new string(s.Where(ch => !char.IsWhiteSpace(ch) && ch != '-' && ch != '_').ToArray());
+        return s;
     }
 
     public async Task<List<Product>> GetProductsAsync(int skip, int limit, string? search, string? category, bool lowStock)
@@ -87,10 +103,16 @@ public class ProductService
         var exists = await GetByBarcodeAsync(dto.Barcode);
         if (exists != null) throw new InvalidOperationException("Barcode already exists");
 
+        // Enforce unique normalized name
+        var norm = NormalizeName(dto.Name);
+        var nameExists = await _db.Products.Find(x => x.NormalizedName == norm).FirstOrDefaultAsync();
+        if (nameExists != null) throw new InvalidOperationException("Aynı isimde ürün mevcut (isim varyasyonu tespit edildi)");
+
         var p = new Product
         {
             Barcode = dto.Barcode,
             Name = dto.Name,
+            NormalizedName = norm,
             Category = dto.Category,
             Brand = dto.Brand,
             Stock = dto.Stock,
@@ -112,6 +134,13 @@ public class ProductService
         {
             var exists = await GetByBarcodeAsync(dto.Barcode);
             if (exists != null) throw new InvalidOperationException("Barcode already exists");
+        }
+        // If name is changing, check normalized duplicates
+        if (dto.Name != null)
+        {
+            var norm = NormalizeName(dto.Name);
+            var nameExists = await _db.Products.Find(x => x.NormalizedName == norm && x.Id != p.Id).FirstOrDefaultAsync();
+            if (nameExists != null) throw new InvalidOperationException("Aynı isimde ürün mevcut (isim varyasyonu tespit edildi)");
         }
         p.ApplyUpdate(dto);
         await _db.Products.ReplaceOneAsync(x => x.Id == id, p);

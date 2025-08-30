@@ -260,6 +260,28 @@ const ProductManagement = () => {
     });
     const [saving, setSaving] = useState(false);
     const existingBarcodes = useMemo(() => new Set(products.map(p => String(p.barcode))), [products]);
+    // Normalize name to catch variations like "LedAmpul" vs "Led Ampul" or dashes/diacritics
+    const normalizeName = (s) => {
+      if (!s) return '';
+      try {
+        return String(s)
+          .trim()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // strip diacritics
+          .toLowerCase()
+          .replace(/[\s\-_]/g, ''); // remove spaces, hyphens, underscores
+      } catch {
+        return String(s).toLowerCase().replace(/[\s\-_]/g, '');
+      }
+    };
+    const existingNameIndex = useMemo(() => {
+      const map = new Map();
+      for (const p of products) {
+        const key = normalizeName(p?.name);
+        if (key) map.set(key, p);
+      }
+      return map;
+    }, [products]);
     const barcodeRef = useRef(null);
     const lastStrongSetRef = useRef(0); // paste/generate sonrası kısa süreli değişiklik kilidi
 
@@ -352,6 +374,19 @@ const ProductManagement = () => {
       setSaving(true);
 
       try {
+        // Prevent duplicate names by normalized comparison
+        const currentKey = normalizeName(formData.name);
+        const clash = existingNameIndex.get(currentKey);
+        if (!product) {
+          if (clash) {
+            throw { response: { data: { detail: `Aynı isimde ürün mevcut: \"${clash.name}\"` } } };
+          }
+        } else {
+          if (clash && clash.id !== product.id) {
+            throw { response: { data: { detail: `Aynı isimde başka bir ürün mevcut: \"${clash.name}\"` } } };
+          }
+        }
+
         if (product) {
           // Edit existing product
           await productsAPI.updateProduct(product.id, formData);
@@ -457,6 +492,15 @@ const ProductManagement = () => {
                     placeholder="Ürün adı"
                     required
                   />
+                  {/* Duplicate name live warning */}
+                  {(() => {
+                    const key = normalizeName(formData.name);
+                    const p = existingNameIndex.get(key);
+                    const conflict = p && (!product || p.id !== product.id);
+                    return conflict ? (
+                      <p className="mt-1 text-xs text-red-600">Benzer isimde ürün var: "{p.name}" — kaydetmeye izin verilmeyecek.</p>
+                    ) : null;
+                  })()}
                 </div>
 
                 <div>

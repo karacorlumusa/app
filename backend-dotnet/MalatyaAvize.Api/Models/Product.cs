@@ -21,4 +21,6 @@ public class Product
     [BsonElement("sell_price")] public double SellPrice { get; set; }
     [BsonElement("tax_rate")] public int TaxRate { get; set; }
     [BsonElement("supplier")] public string? Supplier { get; set; }
+    // Normalized version of Name for duplicate detection (lowercase, no spaces/hyphens/diacritics)
+    [BsonElement("normalized_name")] public string NormalizedName { get; set; } = string.Empty;
 }
