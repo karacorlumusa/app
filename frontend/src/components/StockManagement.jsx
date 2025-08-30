@@ -300,7 +300,9 @@ const StockManagement = () => {
                 </thead>
                 <tbody>
                   {filteredProducts.map((product) => {
-                    const stockStatus = product.stock <= (product.min_stock ?? 0) ? 'critical' : 'normal';
+                    const stockStatus = (product.stock || 0) === 0
+                      ? 'out'
+                      : ((product.stock || 0) <= (product.min_stock ?? 0) ? 'critical' : 'normal');
 
                     return (
                       <tr key={product.id} className="border-b hover:bg-gray-50">
@@ -314,14 +316,18 @@ const StockManagement = () => {
                           <code className="text-sm bg-gray-100 px-2 py-1 rounded">{product.barcode}</code>
                         </td>
                         <td className="py-3">
-                          <span className={`font-bold ${stockStatus === 'critical' ? 'text-red-600' : 'text-green-600'}`}>
-                            {product.stock} adet
-                          </span>
+                          {stockStatus === 'out' ? (
+                            <span className="font-bold text-red-700">Stok YOK</span>
+                          ) : (
+                            <span className={`font-bold ${stockStatus === 'critical' ? 'text-red-600' : 'text-green-600'}`}>
+                              {product.stock} adet
+                            </span>
+                          )}
                         </td>
                         <td className="py-3">{product.min_stock} adet</td>
                         <td className="py-3">
-                          <Badge variant={stockStatus === 'critical' ? 'destructive' : 'default'}>
-                            {stockStatus === 'critical' ? 'Kritik' : 'Normal'}
+                          <Badge variant={(stockStatus === 'critical' || stockStatus === 'out') ? 'destructive' : 'default'}>
+                            {stockStatus === 'out' ? 'Stok Yok' : (stockStatus === 'critical' ? 'Kritik' : 'Normal')}
                           </Badge>
                         </td>
                         <td className="py-3">{formatCurrency(product.buy_price || 0)}</td>
