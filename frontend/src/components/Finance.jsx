@@ -207,12 +207,12 @@ const Finance = ({ user }) => {
                         .brand { font-size: 18px; font-weight: 700; }
                         .meta { font-size: 12px; color:#555; }
                         .summary { display:flex; gap:16px; margin: 12px 0 16px; }
-                        .summary .card { border:1px solid #ddd; padding:10px 12px; border-radius:8px; }
+                        .summary .card { border:1px solid #bbb; padding:10px 12px; border-radius:8px; }
                         .summary .label { font-size:12px; color:#555; }
                         .summary .value { font-size:16px; font-weight:700; }
                         table { width:100%; border-collapse: collapse; }
-                        th, td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 12px; }
-                        th { text-align:left; background:#fafafa; border-top:1px solid #eee; }
+                        th, td { padding: 8px 10px; border: 1px solid #bbb; font-size: 12px; }
+                        th { text-align:left; background:#f5f5f5; }
                         tfoot td { font-weight:700; }
                     </style>
                 `;
@@ -297,12 +297,12 @@ const Finance = ({ user }) => {
                             .brand { font-size: 18px; font-weight: 700; }
                             .meta { font-size: 12px; color:#555; }
                             .summary { display:flex; gap:16px; margin: 12px 0 16px; }
-                            .summary .card { border:1px solid #ddd; padding:10px 12px; border-radius:8px; }
+                            .summary .card { border:1px solid #bbb; padding:10px 12px; border-radius:8px; }
                             .summary .label { font-size:12px; color:#555; }
                             .summary .value { font-size:16px; font-weight:700; }
                             table { width:100%; border-collapse: collapse; }
-                            th, td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 12px; }
-                            th { text-align:left; background:#fafafa; border-top:1px solid #eee; }
+                            th, td { padding: 8px 10px; border: 1px solid #bbb; font-size: 12px; }
+                            th { text-align:left; background:#f5f5f5; }
                             tfoot td { font-weight:700; }
                         `;
 
@@ -400,12 +400,12 @@ const Finance = ({ user }) => {
                         .brand { font-size: 18px; font-weight: 700; }
                         .meta { font-size: 12px; color:#555; }
                         .summary { display:flex; gap:16px; margin: 12px 0 16px; }
-                        .summary .card { border:1px solid #ddd; padding:10px 12px; border-radius:8px; }
+                        .summary .card { border:1px solid #bbb; padding:10px 12px; border-radius:8px; }
                         .summary .label { font-size:12px; color:#555; }
                         .summary .value { font-size:16px; font-weight:700; }
                         table { width:100%; border-collapse: collapse; }
-                        th, td { padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 12px; }
-                        th { text-align:left; background:#fafafa; border-top:1px solid #eee; }
+                        th, td { padding: 8px 10px; border: 1px solid #bbb; font-size: 12px; }
+                        th { text-align:left; background:#f5f5f5; }
                         tfoot td { font-weight:700; }
                     </style>
                 `;

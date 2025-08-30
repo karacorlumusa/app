@@ -189,15 +189,17 @@ public class SalesService
                     container.DefaultTextStyle(x => x.SemiBold())
                              .PaddingVertical(6).PaddingHorizontal(4)
                              .Background(Colors.Grey.Lighten3)
-                             .BorderBottom(1).BorderColor(Colors.Grey.Lighten2);
+                             .Border(1).BorderColor(Colors.Grey.Darken2);
 
                 static IContainer DataCell(IContainer container, int row) =>
                     container.PaddingVertical(4).PaddingHorizontal(4)
-                             .Background(row % 2 == 0 ? Colors.White : Colors.Grey.Lighten5);
+                             .Background(row % 2 == 0 ? Colors.White : Colors.Grey.Lighten5)
+                             .Border(0.5f).BorderColor(Colors.Grey.Darken2);
 
                 static IContainer FooterCell(IContainer container) =>
                     container.PaddingVertical(6).PaddingHorizontal(4)
-                             .Background(Colors.Grey.Lighten3);
+                             .Background(Colors.Grey.Lighten3)
+                             .Border(1).BorderColor(Colors.Grey.Darken2);
             });
         });
 
