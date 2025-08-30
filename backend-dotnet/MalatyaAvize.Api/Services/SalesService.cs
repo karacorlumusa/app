@@ -5,6 +5,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using System.Globalization;
+using Serilog;
 
 namespace MalatyaAvize.Api.Services;
 
@@ -28,11 +29,23 @@ public class SalesService
 
     public async Task<Sale> CreateAsync(SaleCreateDto dto, string cashierId)
     {
-        if (dto.Items.Count == 0) throw new InvalidOperationException("No items");
+        if (dto.Items.Count == 0) throw new InvalidOperationException("Sepet boş (ürün yok)");
         var items = new List<SaleItem>();
+        // Fetch products up-front for validation
+        var ids = dto.Items.Select(i => i.Product_Id).Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+        var products = ids.Count == 0
+            ? new List<Product>()
+            : await _db.Products.Find(p => ids.Contains(p.Id)).ToListAsync();
+        var map = products.ToDictionary(p => p.Id, p => p);
         double subtotal = 0, taxAmount = 0, total = 0;
         foreach (var i in dto.Items)
         {
+            if (i.Quantity <= 0) throw new InvalidOperationException("Geçersiz miktar (1 veya daha büyük olmalı)");
+            if (i.Unit_Price <= 0) throw new InvalidOperationException("Geçersiz birim fiyat (0'dan büyük olmalı)");
+            if (!map.TryGetValue(i.Product_Id, out var p))
+                throw new InvalidOperationException($"Ürün bulunamadı: {i.Product_Name} ({i.Barcode})");
+            if (i.Quantity > p.Stock)
+                throw new InvalidOperationException($"Yetersiz stok: {p.Name} (mevcut {p.Stock}, istenen {i.Quantity})");
             // Interpret unit price as VAT-exclusive (net). Add KDV on top.
             var rate = (i.Tax_Rate / 100.0);
             var netItemTotal = Math.Round(i.Unit_Price * i.Quantity, 2);
@@ -68,15 +81,32 @@ public class SalesService
         };
         await _db.Sales.InsertOneAsync(sale);
 
-        // decrease stocks
+        // decrease stocks (best-effort and robust): atomic $inc, then clamp to zero if needed; log failures
         foreach (var i in items)
         {
-            var p = await _db.Products.Find(x => x.Id == i.Product_Id).FirstOrDefaultAsync();
-            if (p != null)
+            try
             {
-                p.Stock = Math.Max(0, p.Stock - i.Quantity);
-                p.UpdatedAt = DateTime.UtcNow;
-                await _db.Products.ReplaceOneAsync(x => x.Id == p.Id, p);
+                // Atomic decrement
+                var filter = Builders<Product>.Filter.Eq(x => x.Id, i.Product_Id);
+                var update = Builders<Product>.Update
+                    .Inc(x => x.Stock, -i.Quantity)
+                    .Set(x => x.UpdatedAt, DateTime.UtcNow);
+                var res = await _db.Products.UpdateOneAsync(filter, update);
+                if (res.MatchedCount == 0)
+                {
+                    Log.Warning("Stock update: product not found {ProductId} after sale {SaleId}", i.Product_Id, sale.Id);
+                    continue;
+                }
+                // Clamp to zero if negative (concurrency safety)
+                var p2 = await _db.Products.Find(filter).FirstOrDefaultAsync();
+                if (p2 != null && p2.Stock < 0)
+                {
+                    await _db.Products.UpdateOneAsync(filter, Builders<Product>.Update.Set(x => x.Stock, 0).Set(x => x.UpdatedAt, DateTime.UtcNow));
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Stock update failed for product {ProductId} after sale {SaleId}", i.Product_Id, sale.Id);
             }
         }
         return sale;

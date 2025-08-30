@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { useToast } from '../hooks/use-toast';
-import { productsAPI } from '../services/api';
+import { productsAPI, stockAPI } from '../services/api';
 
 const StockManagement = () => {
   const [products, setProducts] = useState([]);
@@ -86,22 +86,18 @@ const StockManagement = () => {
       }
 
       const quantityNum = parseInt(quantity);
-      const newStock = entryType === 'in'
-        ? (product.stock || 0) + quantityNum
-        : Math.max(0, (product.stock || 0) - quantityNum);
-
       try {
-        // Persist by updating the product stock (and optionally buy price/supplier on stock-in)
+        // Use stock movements endpoint (yetkilendirme: her giriş yapan kullanıcı)
         const payload = {
-          stock: newStock,
+          product_id: product.id,
+          type: entryType,
+          quantity: quantityNum,
+          // Optional fields for stock-in
+          ...(entryType === 'in' && unitPrice !== '' && !Number.isNaN(parseFloat(unitPrice)) ? { unit_price: parseFloat(unitPrice) } : {}),
+          ...(entryType === 'in' && supplier ? { supplier } : {}),
+          note
         };
-        if (entryType === 'in') {
-          if (unitPrice !== '' && !Number.isNaN(parseFloat(unitPrice))) {
-            payload.buy_price = parseFloat(unitPrice);
-          }
-          if (supplier) payload.supplier = supplier;
-        }
-        await productsAPI.updateProduct(product.id, payload);
+        await stockAPI.createMovement(payload);
 
         toast({
           title: entryType === 'in' ? 'Stok girişi yapıldı' : 'Stok çıkışı yapıldı',
@@ -112,7 +108,8 @@ const StockManagement = () => {
         onClose();
       } catch (err) {
         console.error('Stok güncellenemedi:', err);
-        toast({ title: 'Hata', description: 'Stok güncellenemedi', variant: 'destructive' });
+        const msg = err?.response?.data?.detail || err?.message || 'Stok güncellenemedi';
+        toast({ title: 'Hata', description: msg, variant: 'destructive' });
       }
     };
 

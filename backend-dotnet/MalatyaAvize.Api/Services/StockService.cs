@@ -22,9 +22,9 @@ public class StockService
     public async Task<StockMovement> CreateMovementAsync(StockMovement m, string userId)
     {
         var p = await _db.Products.Find(x => x.Id == m.Product_Id).FirstOrDefaultAsync();
-        if (p is null) throw new InvalidOperationException("Product not found");
-        if (m.Quantity <= 0) throw new InvalidOperationException("Quantity must be > 0");
-        if (m.Type != "in" && m.Type != "out") throw new InvalidOperationException("Invalid movement type");
+        if (p is null) throw new InvalidOperationException("Ürün bulunamadı");
+        if (m.Quantity <= 0) throw new InvalidOperationException("Miktar 1 veya daha büyük olmalı");
+        if (m.Type != "in" && m.Type != "out") throw new InvalidOperationException("Geçersiz hareket tipi");
         m.Created_By = userId;
         if (m.Unit_Price.HasValue) m.Total_Price = m.Unit_Price.Value * m.Quantity;
         await _db.StockMovements.InsertOneAsync(m);
