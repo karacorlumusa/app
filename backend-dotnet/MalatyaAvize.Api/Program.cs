@@ -152,7 +152,9 @@ app.MapPost("/api/auth/logout", () => Results.Ok(new { message = "Logout success
 app.MapGet("/api/products",
     async (ProductService svc, int skip = 0, int limit = 50, string? search = null, string? category = null, bool low_stock = false) =>
     {
-        var items = await svc.GetProductsAsync(skip, limit, search, category, low_stock);
+        var sk = Math.Max(0, skip);
+        var lm = Math.Clamp(limit <= 0 ? 100 : limit, 1, 1000);
+        var items = await svc.GetProductsAsync(sk, lm, search, category, low_stock);
         return Results.Ok(items.Select(p => p.ToDto()));
     }
 ).RequireAuthorization();

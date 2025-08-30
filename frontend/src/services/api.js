@@ -84,7 +84,9 @@ export const usersAPI = {
 // Products API
 export const productsAPI = {
   getProducts: async (params = {}) => {
-    const response = await api.get('/products', { params });
+    // Ensure a sufficiently high default limit unless caller overrides
+    const q = { limit: 1000, skip: 0, ...params };
+    const response = await api.get('/products', { params: q });
     return response.data;
   },
 
