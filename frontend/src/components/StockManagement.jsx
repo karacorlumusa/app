@@ -60,6 +60,12 @@ const StockManagement = () => {
     }).format(amount);
   };
 
+  // Totals for all in-stock products (not affected by search)
+  const inStockProducts = products.filter((p) => (p.stock || 0) > 0);
+  const totalStockCost = inStockProducts.reduce((sum, p) => sum + (Number(p.buy_price || 0) * Number(p.stock || 0)), 0);
+  const totalSalesNet = inStockProducts.reduce((sum, p) => sum + (Number(p.sell_price || 0) * Number(p.stock || 0)), 0);
+  const totalProfitNet = totalSalesNet - totalStockCost;
+
   const StockEntryForm = ({ product, onClose }) => {
     const [entryType, setEntryType] = useState('in'); // 'in' for stock in, 'out' for stock out
     const [quantity, setQuantity] = useState('');
@@ -220,6 +226,28 @@ const StockManagement = () => {
           </AlertDescription>
         </Alert>
       )}
+
+      {/* Summary of current in-stock valuations */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="p-4 rounded-lg bg-gray-50 border">
+              <p className="text-sm text-gray-600">Toplam Stok Maliyeti</p>
+              <p className="text-2xl font-bold">{formatCurrency(totalStockCost)}</p>
+            </div>
+            <div className="p-4 rounded-lg bg-gray-50 border">
+              <p className="text-sm text-gray-600">Toplam Satış Değeri (KDV Hariç)</p>
+              <p className="text-2xl font-bold">{formatCurrency(totalSalesNet)}</p>
+            </div>
+            <div className="p-4 rounded-lg bg-gray-50 border">
+              <p className="text-sm text-gray-600">Potansiyel Kar (KDV Hariç)</p>
+              <p className={`text-2xl font-bold ${totalProfitNet >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(totalProfitNet)}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Search */}
       <Card>
